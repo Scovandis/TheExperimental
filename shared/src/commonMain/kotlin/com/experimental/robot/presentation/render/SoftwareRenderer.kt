@@ -23,8 +23,8 @@ import kotlin.math.sin
  * @param focalLength panjang fokus relatif terhadap dimensi acuan canvas.
  */
 data class Camera(
-    val target: Vec3 = Vec3(0f, 1.62f, 0f),
-    val distance: Float = 6.4f,
+    val target: Vec3 = Vec3(0f, 1.3f, 0f),
+    val distance: Float = DEFAULT_DISTANCE,
     val azimuthDegrees: Float = -24f,
     val pitchDegrees: Float = 12f,
     val focalLength: Float = 1.3f,
@@ -52,6 +52,20 @@ data class Camera(
     }
 
     private fun Float.toRadians(): Float = this * PI.toFloat() / 180f
+
+    companion object {
+        /** Jarak kamera bawaan; juga acuan tombol "reset" pada kontrol zoom. */
+        const val DEFAULT_DISTANCE = 5.2f
+
+        /** Batas zoom-in: robot tidak boleh menembus lensa kamera. */
+        const val MIN_DISTANCE = 2.4f
+
+        /** Batas zoom-out: robot tidak menyusut jadi titik. */
+        const val MAX_DISTANCE = 12f
+
+        /** Kenaikan jarak per satu tekan tombol zoom. */
+        const val ZOOM_STEP = 0.8f
+    }
 }
 
 /**
@@ -60,7 +74,6 @@ data class Camera(
  * di Android, Desktop, dan iOS tanpa engine grafis tambahan.
  */
 class SoftwareRenderer(
-    private val camera: Camera = Camera(),
     private val lightDirection: Vec3 = Vec3(-0.45f, 0.8f, 0.6f).normalized(),
     private val ambient: Float = 0.34f,
 ) {
@@ -72,7 +85,8 @@ class SoftwareRenderer(
         val depth: Float,
     )
 
-    fun render(scope: DrawScope, mesh: Mesh, canvasSize: Size) {
+    /** [camera] diteruskan per panggilan (bukan disimpan) agar zoom bisa berubah tiap frame. */
+    fun render(scope: DrawScope, mesh: Mesh, camera: Camera, canvasSize: Size) {
         val view = camera.viewMatrix()
         val viewVertices = mesh.vertices.map(view::transform)
         val fragments = ArrayList<Fragment>(mesh.faces.size)
@@ -98,7 +112,7 @@ class SoftwareRenderer(
 
             val path = Path()
             corners.forEachIndexed { index, corner ->
-                val screen = project(corner, canvasSize)
+                val screen = project(corner, camera, canvasSize)
                 if (index == 0) path.moveTo(screen.x, screen.y) else path.lineTo(screen.x, screen.y)
             }
             path.close()
@@ -121,6 +135,7 @@ class SoftwareRenderer(
         from: Vec3,
         to: Vec3,
         color: Color,
+        camera: Camera,
         canvasSize: Size,
         strokeWidth: Float = 1.5f,
     ) {
@@ -130,15 +145,15 @@ class SoftwareRenderer(
         if (a.z > -NEAR_PLANE || b.z > -NEAR_PLANE) return
         scope.drawLine(
             color = color,
-            start = project(a, canvasSize),
-            end = project(b, canvasSize),
+            start = project(a, camera, canvasSize),
+            end = project(b, camera, canvasSize),
             strokeWidth = strokeWidth,
             cap = StrokeCap.Round,
         )
     }
 
     /** Proyeksi view-space -> koordinat layar (Y layar dibalik). */
-    private fun project(point: Vec3, canvasSize: Size): Offset {
+    private fun project(point: Vec3, camera: Camera, canvasSize: Size): Offset {
         // Dimensi acuan berbasis tinggi (dibatasi lebar) agar robot mengisi panggung
         // secara wajar baik di layar ponsel yang tinggi maupun jendela desktop yang lebar.
         val reference = min(canvasSize.height, canvasSize.width * 1.6f)

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -119,6 +120,9 @@ fun TelemetryPanel(state: RobotUiState, modifier: Modifier = Modifier) {
         TelemetryRow("Rotasi Y", "${state.robot.rotationY.toIntString()} deg")
         TelemetryRow("Skala Y", state.robot.scaleY.toFixed2())
         TelemetryRow("Sumber", if (state.manualOverride) "MANUAL" else "GESTUR")
+        if (state.renderMode == RobotRenderMode.THREE_D) {
+            TelemetryRow("Jarak kamera", state.cameraDistance.toFixed2())
+        }
     }
 }
 
@@ -225,6 +229,61 @@ fun RenderModeToggle(
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
         )
+    }
+}
+
+/**
+ * Tombol zoom kamera 3D (perbesar/perkecil panggung robot), ukuran wrap-content
+ * agar tidak melebar mengikuti lebar induknya.
+ *
+ * Zoom murni mengubah jarak kamera orbit ([RobotUiState.cameraDistance]) — bukan
+ * skala robot itu sendiri — sehingga aman dipanggil berkali-kali tanpa memengaruhi
+ * hasil klasifikasi gestur maupun motion engine.
+ */
+@Composable
+fun ZoomControls(
+    onZoomIn: () -> Unit,
+    onZoomOut: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .width(IntrinsicSize.Min)
+            .clip(RoundedCornerShape(10.dp))
+            .background(RobotColors.surface)
+            .border(1.dp, RobotColors.outline, RoundedCornerShape(10.dp))
+            .padding(vertical = 6.dp, horizontal = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = "ZOOM",
+            color = RobotColors.accent,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        ZoomButton(label = "+", onTap = onZoomIn)
+        Box(
+            modifier = Modifier
+                .width(28.dp)
+                .height(1.dp)
+                .background(RobotColors.outline),
+        )
+        ZoomButton(label = "−", onTap = onZoomOut)
+    }
+}
+
+@Composable
+private fun ZoomButton(label: String, onTap: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(RobotColors.fingerOff.copy(alpha = 0.4f))
+            .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = label, color = RobotColors.accent, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
 

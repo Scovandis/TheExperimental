@@ -12,6 +12,7 @@ import com.experimental.robot.domain.model.Handedness
 import com.experimental.robot.domain.model.RobotAction
 import com.experimental.robot.domain.model.RobotState
 import com.experimental.robot.domain.motion.RobotMotionEngine
+import com.experimental.robot.presentation.render.Camera
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -117,12 +118,31 @@ class RobotControlViewModel(
         _uiState.update { it.copy(renderMode = it.renderMode.toggled()) }
     }
 
-    /** Kembalikan robot ke posisi awal tanpa mengubah pipeline kamera. */
+    /** Dekatkan kamera panggung 3D satu langkah (dibatasi [Camera.MIN_DISTANCE]). */
+    fun zoomIn() {
+        _uiState.update {
+            it.copy(cameraDistance = (it.cameraDistance - Camera.ZOOM_STEP).coerceAtLeast(Camera.MIN_DISTANCE))
+        }
+    }
+
+    /** Jauhkan kamera panggung 3D satu langkah (dibatasi [Camera.MAX_DISTANCE]). */
+    fun zoomOut() {
+        _uiState.update {
+            it.copy(cameraDistance = (it.cameraDistance + Camera.ZOOM_STEP).coerceAtMost(Camera.MAX_DISTANCE))
+        }
+    }
+
+    /** Kembalikan robot ke posisi awal & kamera ke jarak bawaan tanpa mengubah pipeline kamera fisik. */
     fun resetRobot() {
         debouncer.reset()
         manualAction = null
         _uiState.update {
-            it.copy(robot = RobotState(), stableAction = RobotAction.IDLE, manualOverride = false)
+            it.copy(
+                robot = RobotState(),
+                stableAction = RobotAction.IDLE,
+                manualOverride = false,
+                cameraDistance = Camera.DEFAULT_DISTANCE,
+            )
         }
     }
 

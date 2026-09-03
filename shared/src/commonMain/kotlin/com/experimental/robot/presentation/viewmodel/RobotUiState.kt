@@ -6,6 +6,7 @@ import com.experimental.robot.domain.model.HandPoint
 import com.experimental.robot.domain.model.Handedness
 import com.experimental.robot.domain.model.RobotAction
 import com.experimental.robot.domain.model.RobotState
+import com.experimental.robot.presentation.render.Camera
 
 /**
  * Satu-satunya sumber kebenaran untuk layer View.
@@ -17,6 +18,8 @@ import com.experimental.robot.domain.model.RobotState
  * @param landmarks 21 titik untuk overlay kerangka tangan.
  * @param manualOverride true bila robot sedang dikendalikan tombol manual.
  * @param renderMode visualisasi robot yang aktif (3D atau siluet 2D).
+ * @param cameraDistance jarak kamera orbit panggung 3D; diatur tombol zoom, murni
+ *        state tampilan (tidak memengaruhi [robot]).
  */
 data class RobotUiState(
     val robot: RobotState = RobotState(),
@@ -31,4 +34,5 @@ data class RobotUiState(
     val trackerStatus: TrackerStatus = TrackerStatus.Idle,
     val manualOverride: Boolean = false,
     val renderMode: RobotRenderMode = RobotRenderMode.THREE_D,
+    val cameraDistance: Float = Camera.DEFAULT_DISTANCE,
 )

@@ -88,6 +88,47 @@ class Render3dTest {
     }
 
     @Test
+    fun setiap_sisi_bola_menghadap_keluar() {
+        val sphere = Mesh.sphere(radius = 1.5f, color = Color.White, latSegments = 6, lonSegments = 8)
+
+        sphere.faces.forEach { face ->
+            val corners = face.indices.map { sphere.vertices[it] }
+            val normal = (corners[1] - corners[0]) cross (corners[2] - corners[1])
+            val centroid = corners.fold(Vec3.ZERO) { acc, v -> acc + v } * (1f / corners.size)
+            assertTrue(
+                (normal dot centroid) > 0f,
+                "winding sisi bola tidak konsisten ke luar: ${face.indices.toList()}",
+            )
+        }
+    }
+
+    @Test
+    fun bola_memiliki_jumlah_sisi_sesuai_segmentasi() {
+        val sphere = Mesh.sphere(radius = 1f, color = Color.White, latSegments = 4, lonSegments = 6)
+        // 2 kutub (kipas 6 segitiga tiap kutub) + (4-2) pita tengah x 6 quad.
+        assertEquals(6 + 6 + 2 * 6, sphere.faces.size)
+    }
+
+    @Test
+    fun ekstrusi_segitiga_menghasilkan_delapan_sisi_menghadap_keluar() {
+        val triangle = listOf(-0.5f to -0.4f, 0.5f to -0.4f, 0f to 0.6f)
+        val badge = Mesh.extrudedPolygon(triangle, depth = 0.1f, color = Color.White)
+
+        // 1 depan + 1 belakang + 3 samping = 5 sisi untuk poligon 3 titik.
+        assertEquals(5, badge.faces.size)
+
+        badge.faces.forEach { face ->
+            val corners = face.indices.map { badge.vertices[it] }
+            val normal = (corners[1] - corners[0]) cross (corners[2] - corners[1])
+            val centroid = corners.fold(Vec3.ZERO) { acc, v -> acc + v } * (1f / corners.size)
+            assertTrue(
+                (normal dot centroid) > 0f,
+                "winding sisi ekstrusi tidak konsisten ke luar: ${face.indices.toList()}",
+            )
+        }
+    }
+
+    @Test
     fun penggabungan_mesh_menggeser_indeks_vertex() {
         val merged = Mesh.box(1f, 1f, 1f, Color.White) + Mesh.box(1f, 1f, 1f, Color.Red)
         assertEquals(16, merged.vertices.size)

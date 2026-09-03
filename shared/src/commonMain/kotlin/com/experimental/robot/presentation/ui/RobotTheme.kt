@@ -17,7 +17,8 @@ object RobotColors {
     val fingerOff = Color(0xFF4B5563)
 
     fun forAction(action: RobotAction): Color = when (action) {
-        RobotAction.IDLE -> Color(0xFF22D3EE)
+        // Idle memakai lavender khas XR-07 (#C39BFF); aksi lain tetap berkode warna fungsional.
+        RobotAction.IDLE -> Color(0xFFC39BFF)
         RobotAction.MOVE_FORWARD -> Color(0xFF4ADE80)
         RobotAction.MOVE_BACKWARD -> Color(0xFFFBBF24)
         RobotAction.ROTATE_LEFT -> Color(0xFF60A5FA)

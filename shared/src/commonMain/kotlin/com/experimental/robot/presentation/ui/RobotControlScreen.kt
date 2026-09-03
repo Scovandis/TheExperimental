@@ -83,27 +83,38 @@ fun RobotControlScreen(
                 .padding(top = 8.dp),
         )
 
-        // Jendela kamera + overlay kerangka tangan.
-        Box(
+        // Kolom kanan atas: jendela kamera + overlay kerangka tangan, lalu tombol zoom di bawahnya.
+        Column(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(10.dp)
-                .size(width = 116.dp, height = 155.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(RobotColors.surfaceSolid)
-                .border(
-                    width = 1.dp,
-                    color = RobotColors.forAction(state.stableAction).copy(alpha = 0.7f),
-                    shape = RoundedCornerShape(12.dp),
-                ),
+                .padding(10.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            CameraFeed(stream = RobotGraph.handLandmarkStream, modifier = Modifier.fillMaxSize())
-            HandSkeletonOverlay(
-                landmarks = state.landmarks,
-                accent = RobotColors.forAction(state.stableAction),
-                crouchThresholdY = GestureConfig().crouchWristY,
-                modifier = Modifier.fillMaxSize(),
-            )
+            Box(
+                modifier = Modifier
+                    .size(width = 116.dp, height = 155.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(RobotColors.surfaceSolid)
+                    .border(
+                        width = 1.dp,
+                        color = RobotColors.forAction(state.stableAction).copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(12.dp),
+                    ),
+            ) {
+                CameraFeed(stream = RobotGraph.handLandmarkStream, modifier = Modifier.fillMaxSize())
+                HandSkeletonOverlay(
+                    landmarks = state.landmarks,
+                    accent = RobotColors.forAction(state.stableAction),
+                    crouchThresholdY = GestureConfig().crouchWristY,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            // Zoom hanya relevan untuk panggung 3D (2D punya pseudo-depth sendiri).
+            if (state.renderMode == RobotRenderMode.THREE_D) {
+                ZoomControls(onZoomIn = viewModel::zoomIn, onZoomOut = viewModel::zoomOut)
+            }
         }
 
         Column(
@@ -141,7 +152,7 @@ fun RobotControlScreen(
                 onReleased = viewModel::onManualActionReleased,
                 onReset = viewModel::resetRobot,
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
+                    .align(Alignment.CenterStart)
                     .padding(10.dp),
             )
         }
@@ -155,6 +166,7 @@ private fun RobotStage(state: RobotUiState, modifier: Modifier = Modifier) {
         RobotRenderMode.THREE_D -> Robot3dCanvas(
             state = state.robot,
             accent = RobotColors.forAction(state.stableAction),
+            cameraDistance = state.cameraDistance,
             modifier = modifier,
         )
 

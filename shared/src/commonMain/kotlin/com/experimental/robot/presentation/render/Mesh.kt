@@ -1,6 +1,9 @@
 package com.experimental.robot.presentation.render
 
 import androidx.compose.ui.graphics.Color
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Satu sisi poligon.
@@ -96,6 +99,116 @@ data class Mesh(
                 ),
                 faces = listOf(Face(intArrayOf(0, 1, 2, 3), color, emissive = true)),
             )
+        }
+
+        /**
+         * Bola UV berpusat di titik asal, dipakai untuk kepala/helm bulat dan sendi bahu.
+         *
+         * Kutub digambar sebagai kipas segitiga (bukan quad degenerate) agar normalnya
+         * tidak pernah nol; pita tengah dipetakan sebagai quad per segmen lintang-bujur.
+         */
+        fun sphere(
+            radius: Float,
+            color: Color,
+            latSegments: Int = 8,
+            lonSegments: Int = 14,
+        ): Mesh {
+            require(latSegments >= 2 && lonSegments >= 3)
+
+            val vertices = mutableListOf<Vec3>()
+            val topPole = 0
+            vertices += Vec3(0f, radius, 0f)
+
+            val ringStart = IntArray(latSegments - 1)
+            for (ring in 1 until latSegments) {
+                val theta = PI.toFloat() * ring / latSegments
+                val y = radius * cos(theta)
+                val ringRadius = radius * sin(theta)
+                ringStart[ring - 1] = vertices.size
+                for (lon in 0 until lonSegments) {
+                    val phi = 2f * PI.toFloat() * lon / lonSegments
+                    vertices += Vec3(ringRadius * cos(phi), y, ringRadius * sin(phi))
+                }
+            }
+            val bottomPole = vertices.size
+            vertices += Vec3(0f, -radius, 0f)
+
+            val faces = mutableListOf<Face>()
+
+            val firstRing = ringStart.first()
+            for (lon in 0 until lonSegments) {
+                val a = firstRing + lon
+                val b = firstRing + (lon + 1) % lonSegments
+                faces += Face(intArrayOf(topPole, b, a), color)
+            }
+
+            for (ring in 0 until ringStart.size - 1) {
+                val current = ringStart[ring]
+                val next = ringStart[ring + 1]
+                for (lon in 0 until lonSegments) {
+                    val nextLon = (lon + 1) % lonSegments
+                    faces += Face(
+                        intArrayOf(current + nextLon, next + nextLon, next + lon, current + lon),
+                        color,
+                    )
+                }
+            }
+
+            val lastRing = ringStart.last()
+            for (lon in 0 until lonSegments) {
+                val a = lastRing + lon
+                val b = lastRing + (lon + 1) % lonSegments
+                faces += Face(intArrayOf(bottomPole, a, b), color)
+            }
+
+            return Mesh(vertices, faces)
+        }
+
+        /**
+         * Ekstrusi poligon 2D cembung sepanjang sumbu Z, dipakai untuk lencana dada
+         * berbentuk segitiga/perisai yang tidak bisa dibuat dari balok.
+         *
+         * @param points2D titik poligon di bidang XY berurutan berlawanan arah jam
+         *        dilihat dari +Z (sisi depan), dan berpusat mendekati titik asal.
+         */
+        fun extrudedPolygon(
+            points2D: List<Pair<Float, Float>>,
+            depth: Float,
+            color: Color,
+            emissiveFront: Boolean = false,
+        ): Mesh {
+            require(points2D.size >= 3)
+            val n = points2D.size
+            val hz = depth / 2f
+
+            val front = points2D.map { (x, y) -> Vec3(x, y, hz) }
+            val back = points2D.map { (x, y) -> Vec3(x, y, -hz) }
+            val vertices = front + back
+
+            val faces = mutableListOf<Face>()
+
+            // Sisi depan (+Z): kipas segitiga, urutan asli sudah CCW dilihat dari +Z.
+            for (i in 1 until n - 1) {
+                faces += Face(intArrayOf(0, i, i + 1), color, emissive = emissiveFront)
+            }
+            // Sisi belakang (-Z): urutan dibalik agar normal menghadap -Z.
+            val backOffset = n
+            for (i in 1 until n - 1) {
+                faces += Face(
+                    intArrayOf(backOffset, backOffset + i + 1, backOffset + i),
+                    color,
+                )
+            }
+            // Sisi samping: satu quad per tepi poligon.
+            for (i in 0 until n) {
+                val next = (i + 1) % n
+                faces += Face(
+                    intArrayOf(backOffset + i, backOffset + next, next, i),
+                    color,
+                )
+            }
+
+            return Mesh(vertices, faces)
         }
     }
 }
