@@ -18,18 +18,20 @@ import kotlin.math.sin
  */
 object RobotMeshBuilder {
 
-    // Palet warna XR-07: badan titanium hampir hitam + aksen ungu (lihat design reference).
-    private val shellColor = Color(0xFF17171F)      // panel luar torso/lengan/kaki
-    private val shellDark = Color(0xFF0D0D11)        // pinggul & recess, sesuai swatch #0D0D11
-    private val helmetColor = Color(0xFF1C1C26)      // kepala, sedikit lebih terang agar terbaca bulat
-    private val jointColor = Color(0xFF0A0A0D)       // sendi & telapak kaki, paling gelap
-    private val visorColor = Color(0xFF05050A)       // panel wajah gelap di sekitar mata
-    private val accentPurple = Color(0xFF7B2CF7)     // #7B2CF7 dari swatch — lencana dada
-    private val glowLavender = Color(0xFFC39BFF)     // #C39BFF dari swatch — cincin cahaya & sol kaki
+    // Palet warna robot retro oranye (sesuai referensi 3D model):
+    private val orangePrimary = Color(0xFFFA541C)  // cangkang oranye cerah utama
+    private val orangeDark = Color(0xFFD4380D)     // lekukan oranye
+    private val darkCharcoal = Color(0xFF262B34)   // pelvis, leher, ear pods, soket bahu
+    private val metalSilver = Color(0xFF8C96A4)    // engsel siku, lutut, capit pincer
+    private val eyeCyan = Color(0xFF67E8F9)        // layar TV-mata cyan bercahaya
+    private val eyeSocket = Color(0xFF141820)      // bingkai mata gelap
+    private val soleGray = Color(0xFF474F5A)       // sol telapak kaki
 
-    private const val HIP_Y = 0.62f
+    private const val HIP_Y = 0.68f
     private const val FOOT_HEIGHT = 0.16f
-    private const val HEAD_RADIUS = 0.40f
+    private const val HEAD_WIDTH = 0.88f
+    private const val HEAD_HEIGHT = 0.58f
+    private const val HEAD_DEPTH = 0.52f
 
     /** Skala pemetaan positionZ (satuan engine) ke satuan dunia render. */
     private const val DEPTH_DIVISOR = 55f
@@ -73,80 +75,154 @@ object RobotMeshBuilder {
         return lines
     }
 
+    data class HologramLine(val from: Vec3, val to: Vec3, val color: Color, val strokeWidth: Float)
+
+    /** Cincin holografik sirkular futuristik di lantai mengikuti posisi robot. */
+    fun hologramPlatformLines(state: RobotState): List<HologramLine> {
+        val lines = mutableListOf<HologramLine>()
+        val centerZ = state.positionZ / DEPTH_DIVISOR
+        val y = 0.006f
+        val twoPi = (2 * kotlin.math.PI).toFloat()
+
+        fun addRing(radius: Float, segments: Int, color: Color, strokeWidth: Float) {
+            val step = twoPi / segments
+            for (i in 0 until segments) {
+                val a1 = i * step
+                val a2 = (i + 1) * step
+                lines += HologramLine(
+                    from = Vec3(kotlin.math.sin(a1) * radius, y, centerZ + kotlin.math.cos(a1) * radius),
+                    to = Vec3(kotlin.math.sin(a2) * radius, y, centerZ + kotlin.math.cos(a2) * radius),
+                    color = color,
+                    strokeWidth = strokeWidth,
+                )
+            }
+        }
+
+        // Cincin luar bercahaya biru-cyan tebal
+        addRing(radius = 1.38f, segments = 36, color = Color(0xFF00E5FF).copy(alpha = 0.85f), strokeWidth = 2.4f)
+        // Cincin kedua
+        addRing(radius = 1.15f, segments = 32, color = Color(0xFF00A3FF).copy(alpha = 0.60f), strokeWidth = 1.6f)
+        // Cincin dalam
+        addRing(radius = 0.72f, segments = 24, color = Color(0xFF38BDF8).copy(alpha = 0.40f), strokeWidth = 1.2f)
+
+        // Radial ticks & crosshairs di sekitar platform
+        val tickCount = 16
+        val tickStep = twoPi / tickCount
+        for (i in 0 until tickCount) {
+            val angle = i * tickStep
+            val isMajor = i % 4 == 0
+            val rInner = 1.38f
+            val rOuter = if (isMajor) 1.58f else 1.48f
+            val alpha = if (isMajor) 0.90f else 0.50f
+            lines += HologramLine(
+                from = Vec3(kotlin.math.sin(angle) * rInner, y, centerZ + kotlin.math.cos(angle) * rInner),
+                to = Vec3(kotlin.math.sin(angle) * rOuter, y, centerZ + kotlin.math.cos(angle) * rOuter),
+                color = Color(0xFF00E5FF).copy(alpha = alpha),
+                strokeWidth = if (isMajor) 2.2f else 1.4f,
+            )
+        }
+        return lines
+    }
+
     private fun upperBody(state: RobotState, accent: Color, swing: Float): Mesh {
         val hipDrop = HIP_Y * (1f - state.scaleY)
         val lift = -hipDrop
         var mesh = Mesh.EMPTY
 
-        // Pinggul rendah & lebar, dasar dari siluet chibi.
-        mesh += Mesh.box(0.62f, 0.24f, 0.46f, shellDark)
+        // 1. Pelvis / Pinggul tengah (Dark Charcoal)
+        mesh += Mesh.box(0.46f, 0.22f, 0.38f, darkCharcoal)
             .transformed(Mat4.translation(0f, HIP_Y + lift, 0f))
 
-        // Torso pendek dan tegap (proporsi chibi: badan jauh lebih pendek dari kepala).
-        val torsoY = HIP_Y + 0.5f + lift
-        mesh += Mesh.box(0.86f, 0.76f, 0.5f, shellColor)
+        // Bola sendi pinggul kiri dan kanan (Orange)
+        mesh += Mesh.sphere(0.15f, orangePrimary, latSegments = 5, lonSegments = 8)
+            .transformed(Mat4.translation(-0.25f, HIP_Y + lift, 0f))
+        mesh += Mesh.sphere(0.15f, orangePrimary, latSegments = 5, lonSegments = 8)
+            .transformed(Mat4.translation(0.25f, HIP_Y + lift, 0f))
+
+        // 2. Torso: Badan oranye membulat
+        val torsoY = HIP_Y + 0.48f + lift
+        mesh += Mesh.box(0.84f, 0.72f, 0.58f, orangePrimary)
+            .transformed(Mat4.translation(0f, torsoY, 0f))
+        mesh += Mesh.box(0.78f, 0.78f, 0.52f, orangePrimary)
             .transformed(Mat4.translation(0f, torsoY, 0f))
 
-        // Lencana dada segitiga terbalik (logo "V" pada referensi), memancarkan cahaya ungu.
-        // Urutan titik CCW dilihat dari +Z (sisi depan) agar sisi emissive menghadap kamera.
-        val badgeTriangle = listOf(0.13f to 0.11f, -0.13f to 0.11f, 0f to -0.14f)
-        mesh += Mesh.extrudedPolygon(badgeTriangle, depth = 0.05f, color = accentPurple, emissiveFront = true)
-            .transformed(Mat4.translation(0f, torsoY + 0.02f, 0.26f))
-
-        // Bahu bulat (ball joint) menonjol di sisi torso.
-        val shoulderY = torsoY + 0.3f
-        val shoulderX = 0.5f
-        mesh += Mesh.sphere(0.19f, shellColor, latSegments = 6, lonSegments = 10)
+        // 3. Bahu bulat di kiri dan kanan
+        val shoulderY = torsoY + 0.25f
+        val shoulderX = 0.48f
+        // Soket bahu dalam gelap
+        mesh += Mesh.sphere(0.14f, darkCharcoal, latSegments = 5, lonSegments = 8)
             .transformed(Mat4.translation(-shoulderX, shoulderY, 0f))
-        mesh += Mesh.sphere(0.19f, shellColor, latSegments = 6, lonSegments = 10)
+        mesh += Mesh.sphere(0.14f, darkCharcoal, latSegments = 5, lonSegments = 8)
             .transformed(Mat4.translation(shoulderX, shoulderY, 0f))
+        // Topi bahu luar oranye
+        mesh += Mesh.sphere(0.17f, orangePrimary, latSegments = 5, lonSegments = 8)
+            .transformed(Mat4.translation(-shoulderX - 0.05f, shoulderY, 0f))
+        mesh += Mesh.sphere(0.17f, orangePrimary, latSegments = 5, lonSegments = 8)
+            .transformed(Mat4.translation(shoulderX + 0.05f, shoulderY, 0f))
 
-        // Lengan pendek & tebal, berayun berlawanan fase dengan kaki.
-        mesh += arm(-shoulderX, shoulderY, -swing * ARM_SWING_DEGREES)
-        mesh += arm(shoulderX, shoulderY, swing * ARM_SWING_DEGREES)
+        // 4. Lengan berengsel dengan capit pincer 3-jari
+        mesh += arm(-shoulderX - 0.05f, shoulderY, -swing * ARM_SWING_DEGREES)
+        mesh += arm(shoulderX + 0.05f, shoulderY, swing * ARM_SWING_DEGREES)
 
-        // Leher pendek menghubungkan torso ke kepala besar.
+        // 5. Leher silinder gelap pendek
         val neckY = torsoY + 0.42f
-        mesh += Mesh.box(0.22f, 0.12f, 0.22f, jointColor)
+        mesh += Mesh.cylinder(0.12f, 0.12f, 0.12f, darkCharcoal, segments = 8)
             .transformed(Mat4.translation(0f, neckY, 0f))
 
-        // Kepala: bola besar sedikit oval, ciri khas desain (helm bulat penuh).
-        val headY = neckY + HEAD_RADIUS * 0.92f
-        mesh += Mesh.sphere(HEAD_RADIUS, helmetColor, latSegments = 9, lonSegments = 16)
-            .transformed(Mat4.translation(0f, headY, 0f) * Mat4.scale(1.06f, 0.94f, 1.0f))
+        // 6. Kepala Kotak Membulat (TV-Head) Oranye
+        val headY = neckY + 0.06f + HEAD_HEIGHT / 2f
+        mesh += Mesh.box(HEAD_WIDTH, HEAD_HEIGHT, HEAD_DEPTH, orangePrimary)
+            .transformed(Mat4.translation(0f, headY, 0f))
+        mesh += Mesh.box(HEAD_WIDTH * 0.94f, HEAD_HEIGHT * 0.94f, HEAD_DEPTH * 1.04f, orangePrimary)
+            .transformed(Mat4.translation(0f, headY, 0f))
 
-        // Panel wajah gelap sebagai dudukan mata (efek "visor" pada referensi).
-        mesh += Mesh.box(0.44f, 0.24f, 0.06f, visorColor)
-            .transformed(Mat4.translation(0f, headY + 0.02f, HEAD_RADIUS * 0.9f))
+        // Ear Muffs / Silinder telinga gelap di kiri & kanan kepala
+        val earX = HEAD_WIDTH / 2f + 0.04f
+        mesh += Mesh.cylinder(0.15f, 0.15f, 0.08f, darkCharcoal, segments = 8)
+            .transformed(Mat4.translation(-earX, headY, 0f) * Mat4.rotationZ(90f))
+        mesh += Mesh.cylinder(0.15f, 0.15f, 0.08f, darkCharcoal, segments = 8)
+            .transformed(Mat4.translation(earX, headY, 0f) * Mat4.rotationZ(90f))
 
-        // Mata LED kotak membulat, warnanya mengikuti aksi (idle = lavender khas XR-07).
-        val eyeColor = if (state.currentAction == RobotAction.CROUCH) Color(0xFFFF5A6E) else accent
-        val eyeZ = HEAD_RADIUS * 0.94f
-        mesh += Mesh.box(0.13f, 0.13f, 0.05f, eyeColor, emissiveFront = true)
-            .transformed(Mat4.translation(-0.15f, headY, eyeZ))
-        mesh += Mesh.box(0.13f, 0.13f, 0.05f, eyeColor, emissiveFront = true)
-            .transformed(Mat4.translation(0.15f, headY, eyeZ))
+        // Dua Layar Mata TV rounded square cyan berdampingan
+        val eyeCol = if (state.currentAction == RobotAction.CROUCH) Color(0xFFFF5A6E) else eyeCyan
+        val eyeZ = HEAD_DEPTH / 2f + 0.02f
+        val eyeSpacing = 0.20f
 
-        // Lampu pelipis di sisi kiri/kanan kepala (ciri khas referensi: aksen menyala di dekat telinga).
-        val templeZ = HEAD_RADIUS * 0.35f
-        val templeX = HEAD_RADIUS * 0.98f
-        mesh += Mesh.box(0.05f, 0.16f, 0.05f, glowLavender, emissiveFront = true)
-            .transformed(Mat4.translation(-templeX, headY, templeZ) * Mat4.rotationY(-90f))
-        mesh += Mesh.box(0.05f, 0.16f, 0.05f, glowLavender, emissiveFront = true)
-            .transformed(Mat4.translation(templeX, headY, templeZ) * Mat4.rotationY(90f))
+        // Mata kiri
+        mesh += Mesh.box(0.26f, 0.25f, 0.04f, eyeSocket)
+            .transformed(Mat4.translation(-eyeSpacing, headY + 0.02f, eyeZ))
+        mesh += Mesh.box(0.22f, 0.21f, 0.05f, eyeCol, emissiveFront = true)
+            .transformed(Mat4.translation(-eyeSpacing, headY + 0.02f, eyeZ + 0.01f))
+
+        // Mata kanan
+        mesh += Mesh.box(0.26f, 0.25f, 0.04f, eyeSocket)
+            .transformed(Mat4.translation(eyeSpacing, headY + 0.02f, eyeZ))
+        mesh += Mesh.box(0.22f, 0.21f, 0.05f, eyeCol, emissiveFront = true)
+            .transformed(Mat4.translation(eyeSpacing, headY + 0.02f, eyeZ + 0.01f))
 
         return mesh
     }
 
-    /** Lengan pendek & tebal digantung dari bahu, lalu diputar pada engsel bahu. */
+    /** Lengan pendek & berengsel dengan capit mekanis 3-jari di ujungnya. */
     private fun arm(shoulderX: Float, shoulderY: Float, swingDegrees: Float): Mesh {
-        val local = Mesh.box(0.24f, 0.5f, 0.24f, shellColor)
-            .transformed(Mat4.translation(0f, -0.26f, 0f)) +
-            Mesh.sphere(0.15f, jointColor, latSegments = 5, lonSegments = 8)
-                .transformed(Mat4.translation(0f, -0.52f, 0f)) +
-            // Tangan kecil membulat di ujung lengan.
-            Mesh.box(0.2f, 0.18f, 0.22f, shellDark)
-                .transformed(Mat4.translation(0f, -0.66f, 0f))
+        val local = Mesh.box(0.14f, 0.16f, 0.14f, darkCharcoal)
+            .transformed(Mat4.translation(0f, -0.10f, 0f)) +
+            // Engsel siku perak
+            Mesh.box(0.14f, 0.10f, 0.14f, metalSilver)
+                .transformed(Mat4.translation(0f, -0.22f, 0f)) +
+            // Lengan bawah oranye melengkung/tapered
+            Mesh.cylinder(0.15f, 0.11f, 0.26f, orangePrimary, segments = 8)
+                .transformed(Mat4.translation(0f, -0.38f, 0f)) +
+            // Gelang pergelangan tangan
+            Mesh.box(0.15f, 0.06f, 0.15f, darkCharcoal)
+                .transformed(Mat4.translation(0f, -0.53f, 0f)) +
+            // Capit tangan mekanis 3-jari (Pincer claws)
+            Mesh.box(0.04f, 0.14f, 0.04f, metalSilver)
+                .transformed(Mat4.translation(-0.06f, -0.62f, 0f) * Mat4.rotationZ(28f)) +
+            Mesh.box(0.04f, 0.14f, 0.04f, metalSilver)
+                .transformed(Mat4.translation(0.05f, -0.62f, 0.04f) * Mat4.rotationZ(-18f)) +
+            Mesh.box(0.04f, 0.14f, 0.04f, metalSilver)
+                .transformed(Mat4.translation(0.05f, -0.62f, -0.04f) * Mat4.rotationZ(-18f))
 
         return local.transformed(
             Mat4.translation(shoulderX, shoulderY, 0f) * Mat4.rotationX(swingDegrees)
@@ -154,28 +230,32 @@ object RobotMeshBuilder {
     }
 
     /**
-     * Kaki pendek & besar digantung dari pinggul; panjangnya selalu tepat setinggi
-     * pinggul sehingga telapak tetap menapak lantai (y = 0) baik berdiri maupun jongkok.
+     * Kaki robot berengsel dengan sepatu bot oranye melebar ke bawah (flared boots),
+     * telapak tetap menapak lantai (y = 0) baik berdiri maupun jongkok.
      */
     private fun legs(hipY: Float, swing: Float): Mesh {
         val shinHeight = (hipY - FOOT_HEIGHT).coerceAtLeast(0.08f)
+        val bootHeight = (shinHeight - 0.14f).coerceAtLeast(0.10f)
 
         fun leg(hipX: Float, swingDegrees: Float): Mesh {
-            val local = Mesh.box(0.3f, shinHeight, 0.3f, shellColor)
-                .transformed(Mat4.translation(0f, -shinHeight / 2f, 0f)) +
-                // Telapak kaki besar dan membulat, ciri khas siluet chibi pada referensi.
-                Mesh.box(0.36f, FOOT_HEIGHT, 0.56f, jointColor)
-                    .transformed(Mat4.translation(0f, -shinHeight - FOOT_HEIGHT / 2f, 0.08f)) +
-                // Strip cahaya di sol kaki (lampu ungu pada referensi).
-                Mesh.box(0.3f, 0.02f, 0.42f, glowLavender, emissiveFront = true)
-                    .transformed(Mat4.translation(0f, -shinHeight - FOOT_HEIGHT + 0.01f, 0.06f))
+            val local = Mesh.box(0.14f, 0.12f, 0.14f, metalSilver)
+                .transformed(Mat4.translation(0f, -0.06f, 0f)) +
+                // Engsel lutut perak
+                Mesh.box(0.15f, 0.10f, 0.15f, metalSilver)
+                    .transformed(Mat4.translation(0f, -0.15f, 0f)) +
+                // Sepatu bot oranye khas mengembang ke bawah (flared boots)
+                Mesh.cylinder(0.15f, 0.28f, bootHeight, orangePrimary, segments = 8)
+                    .transformed(Mat4.translation(0f, -0.15f - bootHeight / 2f, 0.02f)) +
+                // Sol telapak kaki abu-abu bulat menapak lantai y = 0
+                Mesh.box(0.38f, FOOT_HEIGHT, 0.52f, soleGray)
+                    .transformed(Mat4.translation(0f, -shinHeight - FOOT_HEIGHT / 2f, 0.08f))
 
             return local.transformed(
                 Mat4.translation(hipX, hipY, 0f) * Mat4.rotationX(swingDegrees)
             )
         }
 
-        return leg(-0.22f, swing * LEG_SWING_DEGREES) + leg(0.22f, -swing * LEG_SWING_DEGREES)
+        return leg(-0.24f, swing * LEG_SWING_DEGREES) + leg(0.24f, -swing * LEG_SWING_DEGREES)
     }
 
     private const val ARM_SWING_DEGREES = 20f

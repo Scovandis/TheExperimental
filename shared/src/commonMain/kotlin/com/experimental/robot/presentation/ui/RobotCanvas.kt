@@ -121,86 +121,156 @@ private fun DrawScope.drawRobotBody(
     accent: Color,
 ) {
     val swing = sin(state.walkPhase)
-    val legLength = 20f * unit * state.scaleY
+    val legLength = 22f * unit * state.scaleY
     val hipY = groundY - legLength
-    val torsoHeight = 30f * unit * state.scaleY
+    val torsoHeight = 28f * unit * state.scaleY
     val torsoWidth = 26f * unit * widthFactor
     val torsoTop = hipY - torsoHeight
-    val headRadius = 11f * unit
-    val headCenter = Offset(centerX + facing * 1.5f * unit, torsoTop - headRadius * 1.15f)
 
-    // Kaki: garis tebal dari pinggul ke telapak, berayun berlawanan fase.
-    val legSpread = 7f * unit * widthFactor
-    drawLeg(centerX - legSpread, hipY, groundY, unit, swing)
-    drawLeg(centerX + legSpread, hipY, groundY, unit, -swing)
+    val headWidth = 28f * unit * widthFactor
+    val headHeight = 18f * unit
+    val headCenter = Offset(centerX + facing * 2f * unit, torsoTop - headHeight * 0.72f)
 
-    // Lengan di belakang badan supaya siluet badan tetap bersih.
-    val shoulderY = torsoTop + 7f * unit
-    val armSpread = torsoWidth / 2f + 2.5f * unit
-    drawArm(centerX - armSpread, shoulderY, unit, -swing, state.scaleY)
-    drawArm(centerX + armSpread, shoulderY, unit, swing, state.scaleY)
+    // Palet warna robot oranye retro
+    val orangePrimary = Color(0xFFFA541C)
+    val darkCharcoal = Color(0xFF262B34)
+    val eyeCyan = if (state.currentAction == RobotAction.CROUCH) Color(0xFFFF4D4D) else Color(0xFF67E8F9)
+    val eyeSocketColor = Color(0xFF141820)
 
-    // Badan
+    // Kaki: berayun berlawanan fase
+    val legSpread = 7.5f * unit * widthFactor
+    drawLeg(centerX - legSpread, hipY, groundY, unit, swing, widthFactor)
+    drawLeg(centerX + legSpread, hipY, groundY, unit, -swing, widthFactor)
+
+    // Lengan di kedua sisi
+    val shoulderY = torsoTop + 6f * unit * state.scaleY
+    val armSpread = torsoWidth / 2f + 3f * unit
+    drawArm(centerX - armSpread, shoulderY, unit, -swing, state.scaleY, widthFactor, isLeft = true)
+    drawArm(centerX + armSpread, shoulderY, unit, swing, state.scaleY, widthFactor, isLeft = false)
+
+    // Pelvis (dark charcoal)
+    val pelvisWidth = 18f * unit * widthFactor
+    val pelvisHeight = 5.5f * unit * state.scaleY
     drawRoundRect(
-        color = RobotColors.accent,
+        color = darkCharcoal,
+        topLeft = Offset(centerX - pelvisWidth / 2f, hipY - pelvisHeight),
+        size = Size(pelvisWidth, pelvisHeight),
+        cornerRadius = CornerRadius(2.5f * unit, 2.5f * unit),
+    )
+
+    // Badan / Torso (Rounded orange capsule/barrel)
+    drawRoundRect(
+        color = orangePrimary,
         topLeft = Offset(centerX - torsoWidth / 2f, torsoTop),
         size = Size(torsoWidth, torsoHeight),
-        cornerRadius = CornerRadius(6f * unit, 6f * unit),
+        cornerRadius = CornerRadius(7f * unit, 7f * unit),
     )
+    // Shading/highlight pada torso
     drawRoundRect(
-        color = Color.White.copy(alpha = 0.10f),
+        color = Color.White.copy(alpha = 0.15f),
         topLeft = Offset(centerX - torsoWidth / 2f, torsoTop),
-        size = Size(torsoWidth * 0.45f, torsoHeight),
-        cornerRadius = CornerRadius(6f * unit, 6f * unit),
+        size = Size(torsoWidth * 0.38f, torsoHeight),
+        cornerRadius = CornerRadius(7f * unit, 7f * unit),
     )
 
-    // Panel dada sebagai indikator aksi.
+    // Panel dada / aksen indikator aksi (subtle glowing pill)
+    val badgeWidth = 10f * unit * widthFactor
+    val badgeHeight = 2.8f * unit
     drawRoundRect(
         color = accent.copy(alpha = 0.9f),
-        topLeft = Offset(centerX - torsoWidth * 0.22f, torsoTop + torsoHeight * 0.34f),
-        size = Size(torsoWidth * 0.44f, torsoHeight * 0.2f),
-        cornerRadius = CornerRadius(2f * unit, 2f * unit),
+        topLeft = Offset(centerX - badgeWidth / 2f + facing * 1.5f * unit, torsoTop + torsoHeight * 0.38f),
+        size = Size(badgeWidth, badgeHeight),
+        cornerRadius = CornerRadius(1.4f * unit, 1.4f * unit),
     )
 
-    // Leher
-    drawRect(
-        color = RobotColors.chrome.copy(alpha = 0.65f),
-        topLeft = Offset(centerX - 3f * unit, torsoTop - 3f * unit),
-        size = Size(6f * unit, 4f * unit),
-    )
-
-    // Antena
-    drawLine(
-        color = RobotColors.chrome,
-        start = Offset(headCenter.x, headCenter.y - headRadius),
-        end = Offset(headCenter.x, headCenter.y - headRadius - 6f * unit),
-        strokeWidth = 1.6f * unit,
-        cap = StrokeCap.Round,
-    )
-    drawCircle(color = accent, radius = 2f * unit, center = Offset(headCenter.x, headCenter.y - headRadius - 6.5f * unit))
-
-    // Kepala
-    drawCircle(color = RobotColors.chrome, radius = headRadius, center = headCenter)
-    drawCircle(
-        color = Color.Black.copy(alpha = 0.18f),
-        radius = headRadius,
-        center = headCenter,
-        style = Stroke(width = 1.2f * unit),
-    )
-
-    // Mata (LED) mengikuti arah hadap; merah saat jongkok.
-    val eyeColor = if (state.currentAction == RobotAction.CROUCH) Color(0xFFFF4D4D) else accent
-    val eyeOffset = 4.2f * unit * widthFactor
-    val eyeShift = facing * 2.5f * unit
-    drawCircle(eyeColor, 2.1f * unit, Offset(headCenter.x - eyeOffset + eyeShift, headCenter.y))
-    drawCircle(eyeColor, 2.1f * unit, Offset(headCenter.x + eyeOffset + eyeShift, headCenter.y))
-
-    // Mulut / speaker grill
+    // Leher (dark charcoal)
     drawRoundRect(
-        color = Color(0xFF3B4252),
-        topLeft = Offset(headCenter.x - 3.5f * unit + eyeShift, headCenter.y + 4f * unit),
-        size = Size(7f * unit, 1.8f * unit),
-        cornerRadius = CornerRadius(1f * unit, 1f * unit),
+        color = darkCharcoal,
+        topLeft = Offset(centerX - 4f * unit * widthFactor, torsoTop - 3.5f * unit),
+        size = Size(8f * unit * widthFactor, 4.5f * unit),
+        cornerRadius = CornerRadius(1.5f * unit, 1.5f * unit),
+    )
+
+    // Ear pods di samping kepala (kiri & kanan)
+    val earWidth = 3f * unit * widthFactor
+    val earHeight = 9f * unit
+    // Ear kiri
+    drawRoundRect(
+        color = darkCharcoal,
+        topLeft = Offset(headCenter.x - headWidth / 2f - earWidth * 0.8f, headCenter.y - earHeight / 2f),
+        size = Size(earWidth, earHeight),
+        cornerRadius = CornerRadius(1.5f * unit, 1.5f * unit),
+    )
+    // Ear kanan
+    drawRoundRect(
+        color = darkCharcoal,
+        topLeft = Offset(headCenter.x + headWidth / 2f - earWidth * 0.2f, headCenter.y - earHeight / 2f),
+        size = Size(earWidth, earHeight),
+        cornerRadius = CornerRadius(1.5f * unit, 1.5f * unit),
+    )
+
+    // Kepala TV-Head (Rounded box orange)
+    drawRoundRect(
+        color = orangePrimary,
+        topLeft = Offset(headCenter.x - headWidth / 2f, headCenter.y - headHeight / 2f),
+        size = Size(headWidth, headHeight),
+        cornerRadius = CornerRadius(4.5f * unit, 4.5f * unit),
+    )
+
+    // Highlight lembut di atas kepala
+    drawRoundRect(
+        color = Color.White.copy(alpha = 0.16f),
+        topLeft = Offset(headCenter.x - headWidth * 0.44f, headCenter.y - headHeight * 0.44f),
+        size = Size(headWidth * 0.88f, headHeight * 0.35f),
+        cornerRadius = CornerRadius(3f * unit, 3f * unit),
+    )
+
+    // Bingkai layar TV gelap (eye socket)
+    val socketWidth = 20f * unit * widthFactor
+    val socketHeight = 11f * unit
+    val socketX = headCenter.x - socketWidth / 2f + facing * 1.5f * unit
+    val socketY = headCenter.y - socketHeight / 2f + 0.5f * unit
+    drawRoundRect(
+        color = eyeSocketColor,
+        topLeft = Offset(socketX, socketY),
+        size = Size(socketWidth, socketHeight),
+        cornerRadius = CornerRadius(3f * unit, 3f * unit),
+    )
+
+    // Mata cyan kembar (dua kotak rounded sejajar dengan celah di tengah)
+    val eyeWidth = 5.5f * unit * widthFactor
+    val eyeHeight = 6.8f * unit
+    val eyeSpacing = 2.2f * unit * widthFactor
+    val eyeY = socketY + (socketHeight - eyeHeight) / 2f
+    val leftEyeX = headCenter.x - eyeWidth - eyeSpacing / 2f + facing * 1.8f * unit
+    val rightEyeX = headCenter.x + eyeSpacing / 2f + facing * 1.8f * unit
+
+    // Mata Kiri
+    drawRoundRect(
+        color = eyeCyan,
+        topLeft = Offset(leftEyeX, eyeY),
+        size = Size(eyeWidth, eyeHeight),
+        cornerRadius = CornerRadius(1.8f * unit, 1.8f * unit),
+    )
+    // Mata Kanan
+    drawRoundRect(
+        color = eyeCyan,
+        topLeft = Offset(rightEyeX, eyeY),
+        size = Size(eyeWidth, eyeHeight),
+        cornerRadius = CornerRadius(1.8f * unit, 1.8f * unit),
+    )
+
+    // Refleksi kilau mata
+    val glareSize = 1.3f * unit
+    drawCircle(
+        color = Color.White.copy(alpha = 0.85f),
+        radius = glareSize,
+        center = Offset(leftEyeX + eyeWidth * 0.35f, eyeY + eyeHeight * 0.32f),
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = 0.85f),
+        radius = glareSize,
+        center = Offset(rightEyeX + eyeWidth * 0.35f, eyeY + eyeHeight * 0.32f),
     )
 }
 
@@ -210,31 +280,63 @@ private fun DrawScope.drawLeg(
     groundY: Float,
     unit: Float,
     swing: Float,
+    widthFactor: Float,
 ) {
-    val footX = hipX + swing * 6f * unit
     val lift = max(0f, swing) * 3.5f * unit
+    val footX = hipX + swing * 6f * unit
     val kneeX = (hipX + footX) / 2f + swing * 1.5f * unit
     val kneeY = (hipY + groundY) / 2f - lift * 0.4f
+    val currentSoleY = groundY - lift
 
+    // Paha atas (strut metal perak)
     drawLine(
-        color = Color(0xFF6B7280),
+        color = Color(0xFF8C96A4),
         start = Offset(hipX, hipY),
         end = Offset(kneeX, kneeY),
-        strokeWidth = 5.5f * unit,
+        strokeWidth = 5f * unit * widthFactor,
         cap = StrokeCap.Round,
     )
-    drawLine(
+
+    // Engsel lutut
+    drawCircle(
         color = Color(0xFF6B7280),
-        start = Offset(kneeX, kneeY),
-        end = Offset(footX, groundY - lift),
-        strokeWidth = 5.5f * unit,
-        cap = StrokeCap.Round,
+        radius = 3.2f * unit,
+        center = Offset(kneeX, kneeY),
     )
+
+    // Boot mengerucut / flared (trapezoid oranye khas)
+    val bootTopHalf = 3.2f * unit * widthFactor
+    val bootBottomHalf = 5.8f * unit * widthFactor
+    val bootTopY = kneeY + 1f * unit
+    val bootBottomY = currentSoleY - 2.5f * unit
+
+    val bootPath = Path().apply {
+        moveTo(kneeX - bootTopHalf, bootTopY)
+        lineTo(kneeX + bootTopHalf, bootTopY)
+        lineTo(footX + bootBottomHalf, bootBottomY)
+        lineTo(footX - bootBottomHalf, bootBottomY)
+        close()
+    }
+    drawPath(bootPath, color = Color(0xFFFA541C))
+
+    // Highlight boot
+    val highlightPath = Path().apply {
+        moveTo(kneeX - bootTopHalf, bootTopY)
+        lineTo(kneeX - bootTopHalf * 0.25f, bootTopY)
+        lineTo(footX - bootBottomHalf * 0.25f, bootBottomY)
+        lineTo(footX - bootBottomHalf, bootBottomY)
+        close()
+    }
+    drawPath(highlightPath, color = Color.White.copy(alpha = 0.18f))
+
+    // Sol telapak kaki (charcoal/soleGray)
+    val soleWidth = 13f * unit * widthFactor
+    val soleHeight = 3.2f * unit
     drawRoundRect(
-        color = Color(0xFF374151),
-        topLeft = Offset(footX - 4.5f * unit, groundY - lift - 1.5f * unit),
-        size = Size(9f * unit, 3f * unit),
-        cornerRadius = CornerRadius(1.5f * unit, 1.5f * unit),
+        color = Color(0xFF474F5A),
+        topLeft = Offset(footX - soleWidth / 2f, currentSoleY - soleHeight),
+        size = Size(soleWidth, soleHeight),
+        cornerRadius = CornerRadius(1.2f * unit, 1.2f * unit),
     )
 }
 
@@ -244,15 +346,88 @@ private fun DrawScope.drawArm(
     unit: Float,
     swing: Float,
     scaleY: Float,
+    widthFactor: Float,
+    isLeft: Boolean,
 ) {
-    val handX = shoulderX + swing * 4.5f * unit
-    val handY = shoulderY + 18f * unit * scaleY
+    // Soket bahu (dark charcoal)
+    drawCircle(
+        color = Color(0xFF262B34),
+        radius = 3.5f * unit,
+        center = Offset(shoulderX, shoulderY),
+    )
+    // Penutup bahu (oranye)
+    drawCircle(
+        color = Color(0xFFFA541C),
+        radius = 2.4f * unit,
+        center = Offset(shoulderX, shoulderY),
+    )
+
+    val elbowX = shoulderX + swing * 3f * unit
+    val elbowY = shoulderY + 8f * unit * scaleY
+
+    // Lengan atas (strut metal perak)
     drawLine(
-        color = Color(0xFF9CA3AF),
+        color = Color(0xFF8C96A4),
         start = Offset(shoulderX, shoulderY),
-        end = Offset(handX, handY),
-        strokeWidth = 4f * unit,
+        end = Offset(elbowX, elbowY),
+        strokeWidth = 3.5f * unit * widthFactor,
         cap = StrokeCap.Round,
     )
-    drawCircle(color = Color(0xFF6B7280), radius = 2.6f * unit, center = Offset(handX, handY))
+
+    // Engsel siku
+    drawCircle(
+        color = Color(0xFF8C96A4),
+        radius = 2.6f * unit,
+        center = Offset(elbowX, elbowY),
+    )
+
+    val handX = elbowX + swing * 3f * unit
+    val handY = elbowY + 9f * unit * scaleY
+
+    // Lengan bawah (oranye)
+    drawLine(
+        color = Color(0xFFFA541C),
+        start = Offset(elbowX, elbowY),
+        end = Offset(handX, handY),
+        strokeWidth = 4.2f * unit * widthFactor,
+        cap = StrokeCap.Round,
+    )
+
+    // Dudukan capit pincer
+    drawCircle(
+        color = Color(0xFF262B34),
+        radius = 2.2f * unit,
+        center = Offset(handX, handY),
+    )
+
+    // Capit pincer 3 cabang (metalik perak)
+    val clawColor = Color(0xFF8C96A4)
+    val clawStroke = 1.8f * unit
+    val clawLen = 4f * unit
+    val dir = if (isLeft) -1f else 1f
+
+    // Jempol / cabang dalam
+    drawLine(
+        color = clawColor,
+        start = Offset(handX, handY),
+        end = Offset(handX - dir * 2f * unit, handY + clawLen),
+        strokeWidth = clawStroke,
+        cap = StrokeCap.Round,
+    )
+    // Cabang luar atas
+    drawLine(
+        color = clawColor,
+        start = Offset(handX, handY),
+        end = Offset(handX + dir * 2.5f * unit, handY + clawLen * 0.9f),
+        strokeWidth = clawStroke,
+        cap = StrokeCap.Round,
+    )
+    // Cabang luar bawah
+    drawLine(
+        color = clawColor,
+        start = Offset(handX, handY),
+        end = Offset(handX + dir * 1f * unit, handY + clawLen * 1.15f),
+        strokeWidth = clawStroke,
+        cap = StrokeCap.Round,
+    )
 }

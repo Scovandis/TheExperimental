@@ -210,5 +210,50 @@ data class Mesh(
 
             return Mesh(vertices, faces)
         }
+
+        /** Silinder atau kerucut terpancung (frustum) sepanjang sumbu Y. */
+        fun cylinder(
+            radiusTop: Float,
+            radiusBottom: Float,
+            height: Float,
+            color: Color,
+            segments: Int = 8,
+        ): Mesh {
+            val vertices = mutableListOf<Vec3>()
+            val hy = height / 2f
+            val twoPi = (2 * PI).toFloat()
+
+            for (i in 0 until segments) {
+                val phi = i * twoPi / segments
+                vertices += Vec3(radiusTop * cos(phi), hy, radiusTop * sin(phi))
+            }
+            for (i in 0 until segments) {
+                val phi = i * twoPi / segments
+                vertices += Vec3(radiusBottom * cos(phi), -hy, radiusBottom * sin(phi))
+            }
+            val topCenter = vertices.size
+            vertices += Vec3(0f, hy, 0f)
+            val bottomCenter = vertices.size
+            vertices += Vec3(0f, -hy, 0f)
+
+            val faces = mutableListOf<Face>()
+            for (i in 0 until segments) {
+                val next = (i + 1) % segments
+                val topA = i
+                val topB = next
+                val botA = segments + i
+                val botB = segments + next
+                faces += Face(intArrayOf(topA, topB, botB, botA), color)
+            }
+            for (i in 0 until segments) {
+                val next = (i + 1) % segments
+                faces += Face(intArrayOf(topCenter, next, i), color)
+            }
+            for (i in 0 until segments) {
+                val next = (i + 1) % segments
+                faces += Face(intArrayOf(bottomCenter, segments + i, segments + next), color)
+            }
+            return Mesh(vertices, faces)
+        }
     }
 }

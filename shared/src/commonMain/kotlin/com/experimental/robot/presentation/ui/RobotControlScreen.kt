@@ -2,49 +2,63 @@ package com.experimental.robot.presentation.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.experimental.robot.data.TrackerStatus
 import com.experimental.robot.di.RobotGraph
-import com.experimental.robot.domain.gesture.GestureConfig
+import com.experimental.robot.domain.model.HaltMode
 import com.experimental.robot.presentation.viewmodel.RobotControlViewModel
 import com.experimental.robot.presentation.viewmodel.RobotRenderMode
 import com.experimental.robot.presentation.viewmodel.RobotUiState
 
 /**
- * View utama (MVVM): hanya membaca [RobotUiState] dan meneruskan event pengguna ke
- * ViewModel. Tidak ada logika gestur di sini.
+ * Layar Utama Gesture Robot Controller: Desain Sci-Fi Cyber Dashboard.
  *
- * Tata letak menyesuaikan tinggi jendela: pada layar tinggi (ponsel portrait) panel
- * telemetri & peta gestur diletakkan di bawah panggung, sedangkan pada jendela pendek
- * (desktop / landscape) keduanya menjadi overlay agar panggung robot tetap lega.
+ * Mengadopsi arsitektur 3-Kolom yang identik dengan desain referensi:
+ * - Header: Logo, Status Pill (System Ready, Connected, Sim Mode), Actions
+ * - Kolom Kiri: Kamera Preview Card, Telemetry Card, Tips Card
+ * - Kolom Tengah: Panggung 3D Robot XR-07 dengan Platform Hologram & Action/Status Deck
+ * - Kolom Kanan: Peta Gestur 6 Kartu, Gesture Info Card, Mode & View Switcher
+ * - Bottom Dock: Navigation Bar (Home, Calibration, Record, Replay, Settings, Robot Status)
  */
+@Preview(device = "spec:width=1280dp,height=800dp,dpi=240")
 @Composable
 fun RobotControlScreen(
     modifier: Modifier = Modifier,
     viewModel: RobotControlViewModel = viewModel { RobotGraph.createRobotControlViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val trackerActive = state.trackerStatus == TrackerStatus.Running ||
-        state.trackerStatus == TrackerStatus.Initializing
+    var currentTab by remember { mutableStateOf("Home") }
 
     BoxWithConstraints(
         modifier = modifier
@@ -52,129 +66,231 @@ fun RobotControlScreen(
             .background(RobotColors.background)
             .safeContentPadding(),
     ) {
-        val compact = maxHeight < 620.dp
+        val isWideScreen = maxWidth >= 860.dp
 
-        if (compact) {
-            RobotStage(state = state, modifier = Modifier.fillMaxSize())
-        } else {
-            Column(modifier = Modifier.fillMaxSize()) {
-                RobotStage(
-                    state = state,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                )
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 1. Top Dashboard Header Bar
+            TopDashboardBar(
+                state = state,
+                onSettingsClick = { /* Settings dialog/action */ },
+                onMenuClick = { /* Drawer/Menu action */ },
+            )
+
+            // 2. Area Konten Utama
+            if (isWideScreen) {
+                // Tata Letak Landscape / Tablet Widescreen (3 Kolom Sesuai Desain Target)
                 Row(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    TelemetryPanel(state = state, modifier = Modifier.weight(1f))
-                    GestureLegend(activeAction = state.stableAction, modifier = Modifier.weight(1f))
+                    // KOLOM KIRI: Kamera Preview + Telemetri + Tips
+                    Column(
+                        modifier = Modifier
+                            .width(280.dp)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        KameraPreviewCard(
+                            state = state,
+                            stream = RobotGraph.handLandmarkStream,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        TelemetryCard(
+                            state = state,
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+                        TipsCard(modifier = Modifier.fillMaxWidth())
+                    }
+
+                    // KOLOM TENGAH: Panggung Robot 3D + Action & Status Deck
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        // Panggung Robot 3D / 2D
+                        RobotStage(
+                            state = state,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFF070D19))
+                                .border(1.dp, Color(0xFF162A48), RoundedCornerShape(16.dp)),
+                        )
+
+                        // Deck Kontrol: Aksi Saat Ini + Status Kecepatan + Tombol Emergency Stop
+                        CenterActionDeck(
+                            state = state,
+                            onEmergencyStop = viewModel::onEmergencyStop,
+                            onReset = viewModel::resetRobot,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
+                    // KOLOM KANAN: Peta Gestur + Gesture & Hand Info + Mode & View
+                    Column(
+                        modifier = Modifier
+                            .width(300.dp)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        PetaGesturGrid(
+                            activeAction = state.stableAction,
+                            onGestureClick = { action ->
+                                viewModel.onManualActionPressed(action)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        GestureAndHandInfoCard(
+                            state = state,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        ModeAndViewCard(
+                            state = state,
+                            onToggleRenderMode = viewModel::toggleRenderMode,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            } else {
+                // Tata Letak Responsif untuk Layar Portrait / Sempit (Vertically Scrollable)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    RobotStage(
+                        state = state,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF070D19))
+                            .border(1.dp, Color(0xFF162A48), RoundedCornerShape(16.dp)),
+                    )
+
+                    CenterActionDeck(
+                        state = state,
+                        onEmergencyStop = viewModel::onEmergencyStop,
+                        onReset = viewModel::resetRobot,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    KameraPreviewCard(
+                        state = state,
+                        stream = RobotGraph.handLandmarkStream,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    PetaGesturGrid(
+                        activeAction = state.stableAction,
+                        onGestureClick = { action -> viewModel.onManualActionPressed(action) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    GestureAndHandInfoCard(
+                        state = state,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    TelemetryCard(
+                        state = state,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    ModeAndViewCard(
+                        state = state,
+                        onToggleRenderMode = viewModel::toggleRenderMode,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    TipsCard(modifier = Modifier.fillMaxWidth())
+                }
+            }
+
+            // 3. Bottom Navigation Dock
+            BottomNavigationDock(
+                currentTab = currentTab,
+                onTabSelect = { tab ->
+                    currentTab = tab
+                    if (tab == "Calibration") {
+                        viewModel.startCalibration()
+                    }
+                },
+            )
+        }
+
+        // 4. Alert Banner saat Kunci Darurat / Safety Lock Aktif
+        if (state.latched) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 60.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xEE7F1D1D))
+                    .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column {
+                        Text(
+                            text = "${state.halt.name} AKTIF",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                        Text(
+                            text = state.stopReason.label,
+                            color = Color(0xFFFCA5A5),
+                            fontSize = 11.sp,
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFEF4444))
+                            .clickable { viewModel.resetRobot() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "RESET ROBOT",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
         }
 
-        ActionBadge(
-            state = state,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 8.dp),
-        )
-
-        // Kolom kanan atas: jendela kamera + overlay kerangka tangan, lalu tombol zoom di bawahnya.
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(10.dp),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        // 5. Modal Overlay Kalibrasi saat Wizard Berjalan
+        state.calibration?.let { calibration ->
             Box(
                 modifier = Modifier
-                    .size(width = 116.dp, height = 155.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(RobotColors.surfaceSolid)
-                    .border(
-                        width = 1.dp,
-                        color = RobotColors.forAction(state.stableAction).copy(alpha = 0.7f),
-                        shape = RoundedCornerShape(12.dp),
-                    ),
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.70f)),
+                contentAlignment = Alignment.Center,
             ) {
-                CameraFeed(stream = RobotGraph.handLandmarkStream, modifier = Modifier.fillMaxSize())
-                HandSkeletonOverlay(
-                    landmarks = state.landmarks,
-                    accent = RobotColors.forAction(state.stableAction),
-                    crouchThresholdY = GestureConfig().crouchWristY,
-                    modifier = Modifier.fillMaxSize(),
+                CalibrationOverlay(
+                    calibration = calibration,
+                    onNext = viewModel::advanceCalibration,
+                    onCancel = viewModel::cancelCalibration,
                 )
             }
-
-            // Zoom hanya relevan untuk panggung 3D (2D punya pseudo-depth sendiri).
-            if (state.renderMode == RobotRenderMode.THREE_D) {
-                ZoomControls(onZoomIn = viewModel::zoomIn, onZoomOut = viewModel::zoomOut)
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(10.dp)
-                .width(200.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            RenderModeToggle(mode = state.renderMode, onToggle = viewModel::toggleRenderMode)
-            CalibrationLauncher(onStart = viewModel::startCalibration)
-            StatusBanner(status = state.trackerStatus)
-            SafetyBanner(state = state, onReset = viewModel::resetRobot)
-        }
-
-        if (compact) {
-            TelemetryPanel(
-                state = state,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(10.dp)
-                    .width(190.dp),
-            )
-            GestureLegend(
-                activeAction = state.stableAction,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(10.dp)
-                    .width(190.dp),
-            )
-        }
-
-        // Kontrol manual muncul saat pipeline gestur tidak aktif.
-        if (!trackerActive) {
-            ManualControlPad(
-                onPressed = viewModel::onManualActionPressed,
-                onReleased = viewModel::onManualActionReleased,
-                onReset = viewModel::resetRobot,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(10.dp),
-            )
-        }
-
-        // Emergency stop selalu terlihat, di posisi yang sama, tanpa pernah dinonaktifkan.
-        EmergencyStopButton(
-            onEmergencyStop = viewModel::onEmergencyStop,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 14.dp),
-        )
-
-        // Kalibrasi mengambil alih layar: selama berjalan, robot dipaksa berhenti.
-        state.calibration?.let { calibration ->
-            CalibrationOverlay(
-                calibration = calibration,
-                onNext = viewModel::advanceCalibration,
-                onCancel = viewModel::cancelCalibration,
-                modifier = Modifier.align(Alignment.Center),
-            )
         }
     }
 }

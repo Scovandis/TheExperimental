@@ -16,8 +16,10 @@ kotlin = "2.4.10"
 kotlinx-coroutines = "1.11.0"
 material3 = "1.11.0-alpha07"
 mediapipeTasksVision = "0.10.26.1"
+filament = "0.4.0"
 
 [libraries]
+filament-compose = { module = "io.github.erkko68.filament:filament-compose", version.ref = "filament" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }
