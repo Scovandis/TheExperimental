@@ -6,6 +6,7 @@ import android.graphics.Matrix
 import android.os.SystemClock
 import android.util.Log
 import androidx.camera.core.ImageProxy
+import com.experimental.robot.data.FrameRateMeter
 import com.experimental.robot.data.HandLandmarkStream
 import com.experimental.robot.data.TrackerStatus
 import com.experimental.robot.domain.model.HandFrame
@@ -32,6 +33,18 @@ class HandLandmarkerDetector(
 
     private var landmarker: HandLandmarker? = null
     private var lastTimestampMs = 0L
+
+    /** Laju frame yang masuk dari kamera - beda dari laju hasil deteksi. */
+    private val cameraRate = FrameRateMeter()
+
+    /**
+     * Bitmap perantara yang dipakai ulang antar frame.
+     *
+     * Sebelumnya setiap frame mengalokasikan bitmap seukuran `rowStride` dari nol.
+     * Pada 30 FPS itu berarti puluhan megabita per detik yang harus dikumpulkan GC,
+     * dan tekanan GC itulah yang ikut menahan laju deteksi.
+     */
+    private var scratch: Bitmap? = null
 
     /** LIVE_STREAM menolak timestamp yang tidak naik, jadi dipaksa monoton. */
     private fun nextTimestampMs(): Long {
@@ -78,6 +91,9 @@ class HandLandmarkerDetector(
      *        dengan preview yang dilihat pengguna (preview kamera depan di-mirror).
      */
     fun detect(imageProxy: ImageProxy, mirrorHorizontally: Boolean) {
+        // Diukur sebelum apa pun dibuang, supaya angkanya benar-benar laju kamera.
+        stream.publishCameraFps(cameraRate.tick(SystemClock.uptimeMillis()))
+
         val detector = landmarker
         if (detector == null) {
             imageProxy.close()
@@ -100,8 +116,38 @@ class HandLandmarkerDetector(
     fun close() {
         landmarker?.close()
         landmarker = null
+        scratch?.recycle()
+        scratch = null
+        cameraRate.reset()
         stream.reset()
         stream.publishStatus(TrackerStatus.Idle)
+    }
+
+    /**
+     * Ubah [ImageProxy] (RGBA_8888) menjadi bitmap tegak sesuai orientasi perangkat.
+     *
+     * Lebar buffer dihitung dari rowStride agar padding baris tidak menggeser piksel,
+     * lalu hasilnya dipotong kembali ke lebar asli sebelum dirotasi/di-mirror.
+     *
+     * Bitmap perantara dipakai ulang; hanya hasil rotasinya yang masih dialokasikan
+     * tiap frame karena dimensinya bergantung sudut rotasi.
+     */
+    private fun ImageProxy.toUprightBitmap(mirrorHorizontally: Boolean): Bitmap {
+        val plane = planes[0]
+        val bufferWidth = plane.rowStride / plane.pixelStride
+
+        val reusable = scratch?.takeIf { it.width == bufferWidth && it.height == height }
+            ?: Bitmap.createBitmap(bufferWidth, height, Bitmap.Config.ARGB_8888).also {
+                scratch?.recycle()
+                scratch = it
+            }
+        reusable.copyPixelsFromBuffer(plane.buffer)
+
+        val matrix = Matrix().apply {
+            postRotate(imageInfo.rotationDegrees.toFloat())
+            if (mirrorHorizontally) postScale(-1f, 1f)
+        }
+        return Bitmap.createBitmap(reusable, 0, 0, width, height, matrix, true)
     }
 
     private fun publishResult(result: HandLandmarkerResult) {
@@ -130,23 +176,4 @@ class HandLandmarkerDetector(
         const val TAG = "HandLandmarkerDetector"
         const val MODEL_ASSET = "hand_landmarker.task"
     }
-}
-
-/**
- * Ubah [ImageProxy] (RGBA_8888) menjadi bitmap tegak sesuai orientasi perangkat.
- *
- * Lebar buffer dihitung dari rowStride agar padding baris tidak menggeser piksel,
- * lalu hasilnya dipotong kembali ke lebar asli sebelum dirotasi/di-mirror.
- */
-private fun ImageProxy.toUprightBitmap(mirrorHorizontally: Boolean): Bitmap {
-    val plane = planes[0]
-    val bufferWidth = plane.rowStride / plane.pixelStride
-    val padded = Bitmap.createBitmap(bufferWidth, height, Bitmap.Config.ARGB_8888)
-    padded.copyPixelsFromBuffer(plane.buffer)
-
-    val matrix = Matrix().apply {
-        postRotate(imageInfo.rotationDegrees.toFloat())
-        if (mirrorHorizontally) postScale(-1f, 1f)
-    }
-    return Bitmap.createBitmap(padded, 0, 0, width, height, matrix, true)
 }

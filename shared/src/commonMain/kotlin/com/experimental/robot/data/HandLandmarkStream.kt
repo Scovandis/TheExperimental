@@ -30,9 +30,13 @@ class HandLandmarkStream(
 
     private val _status = MutableStateFlow<TrackerStatus>(TrackerStatus.Idle)
 
+    private val _cameraFps = MutableStateFlow(0)
+
     override val handFrames: Flow<HandFrame?> = _frames.asSharedFlow().map(smoother::smooth)
 
     override val status: StateFlow<TrackerStatus> = _status.asStateFlow()
+
+    override val cameraFps: StateFlow<Int> = _cameraFps.asStateFlow()
 
     /** Dipanggil dari thread analisis kamera; non-blocking. */
     fun publish(frame: HandFrame?) {
@@ -43,8 +47,14 @@ class HandLandmarkStream(
         _status.value = status
     }
 
+    /** Dipanggil layer kamera setiap kali jendela pengukuran selesai. */
+    fun publishCameraFps(fps: Int) {
+        _cameraFps.value = fps
+    }
+
     fun reset() {
         smoother.reset()
         _frames.tryEmit(null)
+        _cameraFps.value = 0
     }
 }

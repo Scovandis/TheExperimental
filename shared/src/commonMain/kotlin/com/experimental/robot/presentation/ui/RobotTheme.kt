@@ -16,6 +16,10 @@ object RobotColors {
     val fingerOn = Color(0xFF4ADE80)
     val fingerOff = Color(0xFF4B5563)
 
+    /** Dipakai untuk semua kondisi berhenti - emergency, safety lock, dan gerbang safety. */
+    val danger = Color(0xFFEF4444)
+    val dangerSurface = Color(0xFF2A1113)
+
     fun forAction(action: RobotAction): Color = when (action) {
         // Idle memakai lavender khas XR-07 (#C39BFF); aksi lain tetap berkode warna fungsional.
         RobotAction.IDLE -> Color(0xFFC39BFF)

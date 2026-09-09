@@ -125,7 +125,9 @@ fun RobotControlScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             RenderModeToggle(mode = state.renderMode, onToggle = viewModel::toggleRenderMode)
+            CalibrationLauncher(onStart = viewModel::startCalibration)
             StatusBanner(status = state.trackerStatus)
+            SafetyBanner(state = state, onReset = viewModel::resetRobot)
         }
 
         if (compact) {
@@ -154,6 +156,24 @@ fun RobotControlScreen(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(10.dp),
+            )
+        }
+
+        // Emergency stop selalu terlihat, di posisi yang sama, tanpa pernah dinonaktifkan.
+        EmergencyStopButton(
+            onEmergencyStop = viewModel::onEmergencyStop,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 14.dp),
+        )
+
+        // Kalibrasi mengambil alih layar: selama berjalan, robot dipaksa berhenti.
+        state.calibration?.let { calibration ->
+            CalibrationOverlay(
+                calibration = calibration,
+                onNext = viewModel::advanceCalibration,
+                onCancel = viewModel::cancelCalibration,
+                modifier = Modifier.align(Alignment.Center),
             )
         }
     }

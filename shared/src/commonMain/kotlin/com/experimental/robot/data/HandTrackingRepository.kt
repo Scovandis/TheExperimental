@@ -12,4 +12,13 @@ import kotlinx.coroutines.flow.StateFlow
 interface HandTrackingRepository {
     val handFrames: Flow<HandFrame?>
     val status: StateFlow<TrackerStatus>
+
+    /**
+     * Laju frame yang masuk dari kamera, diukur di sisi platform.
+     *
+     * Dipisah dari laju deteksi karena keduanya bisa berbeda jauh: kamera 30 FPS dengan
+     * inferensi 13 FPS berarti dua pertiga frame dibuang. Tanpa dua angka terpisah,
+     * penurunan performa tidak bisa dilacak ke penyebabnya.
+     */
+    val cameraFps: StateFlow<Int>
 }

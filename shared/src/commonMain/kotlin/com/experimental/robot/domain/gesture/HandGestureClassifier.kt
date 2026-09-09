@@ -19,6 +19,7 @@ import com.experimental.robot.domain.model.RobotAction
 class HandGestureClassifier(
     private val config: GestureConfig = GestureConfig(),
     private val fingerDetector: FingerExtensionDetector = FingerExtensionDetector(config),
+    private val confidenceScorer: GestureConfidenceScorer = GestureConfidenceScorer(config),
 ) : GestureClassifier {
 
     override fun classify(hand: HandFrame?): GestureResult {
@@ -48,6 +49,11 @@ class HandGestureClassifier(
             else -> RobotAction.IDLE
         }
 
-        return GestureResult(action = action, fingers = fingers, handDetected = true)
+        return GestureResult(
+            action = action,
+            fingers = fingers,
+            handDetected = true,
+            confidence = confidenceScorer.score(hand, action),
+        )
     }
 }

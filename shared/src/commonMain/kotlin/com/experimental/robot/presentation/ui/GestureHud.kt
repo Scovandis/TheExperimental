@@ -32,10 +32,20 @@ import com.experimental.robot.domain.model.RobotAction
 import com.experimental.robot.presentation.viewmodel.RobotRenderMode
 import com.experimental.robot.presentation.viewmodel.RobotUiState
 
-/** Badge besar berisi aksi aktif + progres debounce gestur berikutnya. */
+/**
+ * Badge utama mode pengguna: aksi, kecepatan, keyakinan, dan status lock.
+ *
+ * Tiga angka inilah yang menjawab pertanyaan pengguna - robot sedang apa, seberapa
+ * cepat, dan apakah sistem benar-benar sudah menerima perintahnya. Sisanya teknis
+ * dan tinggal di [TelemetryPanel].
+ */
 @Composable
 fun ActionBadge(state: RobotUiState, modifier: Modifier = Modifier) {
-    val accent = RobotColors.forAction(state.stableAction)
+    val accent = if (state.halt.blocksMovement) {
+        RobotColors.danger
+    } else {
+        RobotColors.forAction(state.stableAction)
+    }
     val animatedAccent by animateColorAsState(accent, label = "actionAccent")
 
     Column(
@@ -45,37 +55,105 @@ fun ActionBadge(state: RobotUiState, modifier: Modifier = Modifier) {
             .border(1.dp, animatedAccent.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = "AKSI: ${state.stableAction.label}",
+            text = if (state.halt.blocksMovement) state.halt.name else "AKSI: ${state.stableAction.label}",
             color = animatedAccent,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
         )
-        Text(
-            text = state.stableAction.gestureHint,
-            color = RobotColors.textSecondary,
-            fontSize = 11.sp,
-        )
-        if (state.rawAction != state.stableAction) {
+
+        if (state.halt.blocksMovement) {
             Text(
-                text = "Mengonfirmasi ${state.rawAction.label}...",
+                text = state.stopReason.label,
+                color = RobotColors.textSecondary,
+                fontSize = 11.sp,
+            )
+        } else {
+            SpeedBar(
+                speed = state.command.speed,
+                color = animatedAccent,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "CONF ${(state.confidence * 100).toInt()}%",
+                color = RobotColors.textSecondary,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+            )
+            Text(
+                text = if (state.locked) "LOCKED" else state.confidenceTier.label,
+                color = if (state.locked) RobotColors.fingerOn else RobotColors.textSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+            )
+        }
+
+        // Progres menuju lock hanya relevan selama kandidat belum terkonfirmasi.
+        if (!state.locked && state.confidenceTier.isActionable) {
+            Text(
+                text = "Mengonfirmasi ${state.rawAction.label}... ${state.stabilityMs} ms",
                 color = RobotColors.textPrimary,
                 fontSize = 11.sp,
-                modifier = Modifier.padding(top = 4.dp),
             )
-            DebounceMeter(
-                progress = state.debounceProgress,
+            ProgressMeter(
+                progress = state.lockProgress,
                 color = RobotColors.forAction(state.rawAction),
-                modifier = Modifier.padding(top = 4.dp),
             )
+        }
+
+        // Gestur darurat sedang ditahan: beri tahu sebelum benar-benar terpicu.
+        if (state.emergencyProgress > 0f && !state.latched) {
+            Text(
+                text = "EMERGENCY STOP dalam...",
+                color = RobotColors.danger,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            ProgressMeter(progress = state.emergencyProgress, color = RobotColors.danger)
         }
     }
 }
 
-/** Indikator seberapa lama gestur kandidat sudah bertahan. */
+/** Bar kecepatan proporsional 0..100%. */
 @Composable
-private fun DebounceMeter(progress: Float, color: Color, modifier: Modifier = Modifier) {
+private fun SpeedBar(speed: Float, color: Color, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(120.dp)
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color.White.copy(alpha = 0.15f)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(speed.coerceIn(0f, 1f))
+                    .height(6.dp)
+                    .background(color),
+            )
+        }
+        Text(
+            text = "${(speed * 100).toInt()}%",
+            color = RobotColors.textPrimary,
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+        )
+    }
+}
+
+/** Indikator progres tipis; dipakai untuk lock gestur dan tahanan gestur darurat. */
+@Composable
+private fun ProgressMeter(progress: Float, color: Color, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .width(140.dp)
@@ -92,7 +170,13 @@ private fun DebounceMeter(progress: Float, color: Color, modifier: Modifier = Mo
     }
 }
 
-/** Panel telemetri: status jari, FPS deteksi, dan state robot. */
+/**
+ * Panel telemetri mode developer: persepsi, keputusan, dan laju keempat tahap pipeline.
+ *
+ * Empat laju ditampilkan terpisah karena satu angka gabungan tidak bisa dipakai
+ * mendiagnosis apa pun - ketika angkanya turun, camera vs detection vs render
+ * menunjukkan tahap mana yang jadi hambatan.
+ */
 @Composable
 fun TelemetryPanel(state: RobotUiState, modifier: Modifier = Modifier) {
     Column(
@@ -115,7 +199,23 @@ fun TelemetryPanel(state: RobotUiState, modifier: Modifier = Modifier) {
         }
         TelemetryRow("Tangan", if (state.handDetected) "TERDETEKSI (${state.handedness.name})" else "TIDAK ADA")
         TelemetryRow("Jari terbuka", state.fingers.extendedCount.toString())
-        TelemetryRow("FPS deteksi", state.detectionFps.toString())
+        TelemetryRow("Gestur mentah", state.rawAction.label)
+        TelemetryRow("Keyakinan", "${(state.confidence * 100).toInt()}% ${state.confidenceTier.label}")
+        TelemetryRow("Stabilitas", "${state.stabilityMs} ms")
+        TelemetryRow("Fase", state.phase.label)
+        TelemetryRow("Halt", "${state.halt.name} / ${state.stopReason.label}")
+        if (state.handLostMs > 0L) {
+            TelemetryRow("Tangan hilang", "${state.handLostMs} ms")
+        }
+        TelemetryRow("Perintah", "${state.command.direction.name} ${(state.command.speed * 100).toInt()}%")
+        TelemetryRow("Rotasi perintah", "${state.command.rotation.toIntString()} deg/s")
+        TelemetryRow("Zona kontrol", "${state.controlVector.horizontal.name}/${state.controlVector.vertical.name}")
+        TelemetryRow("Seq", state.command.sequence.toString())
+        TelemetryRow(
+            "FPS cam/det/render",
+            "${state.frameRates.camera}/${state.frameRates.detection}/${state.frameRates.render}",
+        )
+        TelemetryRow("Laju perintah", "${state.frameRates.commandHz} Hz")
         TelemetryRow("Posisi Z", state.robot.positionZ.toIntString())
         TelemetryRow("Rotasi Y", "${state.robot.rotationY.toIntString()} deg")
         TelemetryRow("Skala Y", state.robot.scaleY.toFixed2())
