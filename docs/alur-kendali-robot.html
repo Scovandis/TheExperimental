@@ -1,0 +1,574 @@
+<title>Alur Kendali Robot</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#EDF2F6; --bg-grid:#DEE8F0; --surface:#FFFFFF; --surface-2:#F4F8FA;
+    --ink:#16283F; --ink-dim:#55708A; --line:#2F5273; --border:#C9D7E2;
+    --accent:#B5590C; --accent-soft:#F3DFC7; --accent-ink:#7A3B06;
+    --critical:#C23B22; --critical-soft:#F7DCD3;
+    --ok:#1B7A5E; --ok-soft:#D9EFE6;
+    --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif;
+    --font-body:"IBM Plex Sans",system-ui,sans-serif;
+    --font-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0B1B2C; --bg-grid:#122840; --surface:#102338; --surface-2:#132A42;
+      --ink:#E8EFF6; --ink-dim:#8FA9C2; --line:#7FB3D9; --border:#223A56;
+      --accent:#E38F3B; --accent-soft:#3B2A17; --accent-ink:#F5C48A;
+      --critical:#FF7A5C; --critical-soft:#3A1B14;
+      --ok:#4FD0A5; --ok-soft:#123329;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B1B2C; --bg-grid:#122840; --surface:#102338; --surface-2:#132A42;
+    --ink:#E8EFF6; --ink-dim:#8FA9C2; --line:#7FB3D9; --border:#223A56;
+    --accent:#E38F3B; --accent-soft:#3B2A17; --accent-ink:#F5C48A;
+    --critical:#FF7A5C; --critical-soft:#3A1B14;
+    --ok:#4FD0A5; --ok-soft:#123329;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding-block:28px; background:var(--bg); color:var(--ink);
+    font-family:var(--font-body); font-size:15px; line-height:1.55;
+    padding-left:max(16px,calc((100% - 1080px)/2));
+    padding-right:max(16px,calc((100% - 1080px)/2));
+    background-image:
+      linear-gradient(var(--bg-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+    background-size:28px 28px;
+  }
+  .sheet{max-width:1080px; margin:0 auto; position:relative;}
+
+  h1,h2,h3{font-family:var(--font-display); font-weight:700; text-wrap:balance; margin:0;}
+  p{margin:0;}
+  a{color:var(--accent-ink);}
+
+  .eyebrow{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-dim);
+  }
+
+  /* header */
+  header.masthead{
+    border:1px solid var(--border); background:var(--surface); border-radius:4px;
+    padding:26px 28px; margin-bottom:22px; position:relative;
+  }
+  header.masthead::before, header.masthead::after,
+  .corner-tl, .corner-br{
+    content:""; position:absolute; width:14px; height:14px;
+    border-color:var(--line); opacity:.55;
+  }
+  header.masthead::before{ top:8px; left:8px; border-top:2px solid var(--line); border-left:2px solid var(--line);}
+  header.masthead::after{ top:8px; right:8px; border-top:2px solid var(--line); border-right:2px solid var(--line);}
+  .corner-tl{bottom:8px; left:8px; border-bottom:2px solid var(--line); border-left:2px solid var(--line);}
+  .corner-br{bottom:8px; right:8px; border-bottom:2px solid var(--line); border-right:2px solid var(--line);}
+  header.masthead h1{font-size:clamp(28px,4vw,40px); margin-top:6px; letter-spacing:-.01em;}
+  .dek{font-size:15.5px; color:var(--ink-dim); max-width:62ch; margin-top:10px;}
+  .meta-row{
+    display:flex; flex-wrap:wrap; gap:10px 22px; margin-top:18px; padding-top:16px;
+    border-top:1px dashed var(--border); font-family:var(--font-mono); font-size:12px; color:var(--ink-dim);
+  }
+  .meta-row b{color:var(--ink); font-weight:600;}
+
+  /* index / nav */
+  nav.toc{
+    display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 30px; padding:0;
+  }
+  nav.toc a{
+    font-family:var(--font-mono); font-size:12px; text-decoration:none; color:var(--ink);
+    border:1px solid var(--border); background:var(--surface); padding:6px 12px; border-radius:999px;
+    white-space:nowrap;
+  }
+  nav.toc a:hover{border-color:var(--line);}
+  nav.toc span.num{color:var(--accent-ink); font-weight:600; margin-right:6px;}
+
+  /* sections */
+  section.sheet-section{margin-bottom:44px;}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:6px;}
+  .sec-head .idx{
+    font-family:var(--font-mono); font-size:13px; color:var(--accent-ink);
+    background:var(--accent-soft); border-radius:4px; padding:2px 8px; font-weight:600;
+  }
+  .sec-head h2{font-size:22px;}
+  .sec-prose{max-width:74ch; color:var(--ink-dim); margin:10px 0 18px; font-size:14.5px;}
+  .sec-prose b{color:var(--ink); font-weight:600;}
+  .sec-prose code{font-family:var(--font-mono); font-size:.92em; background:var(--surface-2); padding:1px 5px; border-radius:3px; color:var(--ink);}
+
+  figure{margin:0;}
+  .diagram-frame{
+    border:1px solid var(--border); background:var(--surface); border-radius:6px;
+    padding:16px; overflow-x:auto;
+  }
+  figcaption{font-size:12.5px; color:var(--ink-dim); margin-top:10px; max-width:76ch;}
+  figcaption b{color:var(--ink);}
+
+  svg text{font-family:var(--font-body); fill:var(--ink);}
+  svg .lbl-title{font-weight:600; font-size:12px;}
+  svg .lbl-sub{font-size:9.5px; fill:var(--ink-dim);}
+  svg .lbl-mono{font-family:var(--font-mono); font-size:10px; fill:var(--ink-dim);}
+  svg .lbl-lane{font-family:var(--font-mono); font-size:11px; letter-spacing:.05em; fill:var(--ink-dim);}
+  svg .box{fill:var(--surface); stroke:var(--line); stroke-width:1.4;}
+  svg .box-accent{fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.6;}
+  svg .box-critical{fill:var(--critical-soft); stroke:var(--critical); stroke-width:1.4;}
+  svg .band{fill:var(--surface-2); stroke:var(--border); stroke-width:1;}
+  svg .chip{fill:var(--surface); stroke:var(--line); stroke-width:1.1;}
+  svg .edge{stroke:var(--line); stroke-width:1.5; fill:none;}
+  svg .edge-dashed{stroke:var(--accent-ink); stroke-width:1.5; fill:none; stroke-dasharray:5 4;}
+  svg .edge-critical{stroke:var(--critical); stroke-width:1.6; fill:none;}
+  svg .divider{stroke:var(--ink-dim); stroke-width:1.2; stroke-dasharray:4 5; opacity:.6;}
+  svg .crit-text{fill:var(--critical); font-family:var(--font-mono); font-size:10.5px; font-weight:600;}
+
+  table.platform{width:100%; border-collapse:collapse; font-size:13.5px;}
+  table.platform th, table.platform td{
+    border:1px solid var(--border); padding:9px 12px; text-align:left; vertical-align:top;
+  }
+  table.platform thead th{
+    background:var(--surface-2); font-family:var(--font-mono); font-size:11px; letter-spacing:.05em;
+    text-transform:uppercase; color:var(--ink-dim); font-weight:600;
+  }
+  table.platform tbody th{font-weight:600; background:var(--surface-2); white-space:nowrap;}
+  .tag{
+    display:inline-block; font-family:var(--font-mono); font-size:11px; padding:1px 7px;
+    border-radius:3px; font-weight:600;
+  }
+  .tag-ok{background:var(--ok-soft); color:var(--ok);}
+  .tag-no{background:var(--critical-soft); color:var(--critical);}
+
+  footer{
+    margin-top:40px; padding-top:18px; border-top:1px dashed var(--border);
+    font-family:var(--font-mono); font-size:11.5px; color:var(--ink-dim);
+    display:flex; flex-wrap:wrap; gap:8px 20px; justify-content:space-between;
+  }
+  footer a{color:var(--ink-dim);}
+
+  @media (max-width:640px){
+    header.masthead{padding:20px 16px;}
+    .sec-head h2{font-size:19px;}
+  }
+</style>
+
+<div class="sheet">
+
+  <header class="masthead">
+    <div class="corner-tl"></div><div class="corner-br"></div>
+    <div class="eyebrow">Peta Alur Sistem &middot; shared/src/commonMain/robot</div>
+    <h1>Alur Kendali Robot</h1>
+    <p class="dek">
+      Dari gestur tangan di depan kamera sampai robot bergerak di panggung 3D — enam diagram yang
+      menggambarkan mekanisme sesungguhnya di balik kode, bukan cuma nama modulnya.
+    </p>
+    <div class="meta-row">
+      <span><b>Sumber</b> &mdash; commit c42e003</span>
+      <span><b>Cakupan</b> &mdash; hanya alur/flow</span>
+      <span><b>Dokumen terkait</b> &mdash; FLOW.md &middot; AUDIT_INCOMPLETE.md &middot; TEST_CASES.md</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Daftar isi">
+    <a href="#arsitektur"><span class="num">01</span>Lapisan Arsitektur</a>
+    <a href="#pipeline"><span class="num">02</span>Pipeline Persepsi &rarr; Kendali</a>
+    <a href="#keselamatan"><span class="num">03</span>Gerbang Keselamatan</a>
+    <a href="#kalibrasi"><span class="num">04</span>Kalibrasi</a>
+    <a href="#manual"><span class="num">05</span>Kontrol Manual</a>
+    <a href="#platform"><span class="num">06</span>Dukungan Platform</a>
+  </nav>
+
+  <!-- 01 ARSITEKTUR -->
+  <section class="sheet-section" id="arsitektur">
+    <div class="sec-head"><span class="idx">01</span><h2>Lapisan Arsitektur</h2></div>
+    <p class="sec-prose">
+      Tiga lapisan, satu arah dependensi: <b>presentation</b> memakai <b>domain</b>, <b>domain</b>
+      memakai <b>data</b> &mdash; tidak pernah sebaliknya. Semua kelas domain adalah fungsi murni
+      (<code>evaluate()</code>, <code>step()</code>, <code>classify()</code>) yang menerima state
+      dan mengembalikan state baru, tanpa efek samping tersembunyi.
+    </p>
+    <figure>
+      <div class="diagram-frame">
+        <svg viewBox="0 0 760 330" width="760" role="img"
+             aria-label="Tiga lapisan arsitektur: presentation berisi ui, viewmodel, render; domain berisi gesture, command, safety, motion, calibration; data berisi HandLandmarkStream dan TrackerStatus. Panah menurun menandai arah dependensi dari presentation ke domain ke data.">
+          <rect class="band" x="30" y="30" width="700" height="90" rx="10"/>
+          <rect class="band" x="30" y="140" width="700" height="90" rx="10"/>
+          <rect class="band" x="30" y="250" width="700" height="70" rx="10"/>
+          <text class="lbl-lane" x="46" y="46">PRESENTATION</text>
+          <text class="lbl-lane" x="46" y="156">DOMAIN</text>
+          <text class="lbl-lane" x="46" y="266">DATA</text>
+
+          <g>
+            <rect class="chip" x="60" y="58" width="200" height="42" rx="6"/>
+            <text class="lbl-title" x="160" y="82" text-anchor="middle">ui/*</text>
+            <rect class="chip" x="280" y="58" width="200" height="42" rx="6"/>
+            <text class="lbl-title" x="380" y="82" text-anchor="middle">viewmodel</text>
+            <rect class="chip" x="500" y="58" width="200" height="42" rx="6"/>
+            <text class="lbl-title" x="600" y="82" text-anchor="middle">render (3D / 2D)</text>
+          </g>
+
+          <g>
+            <rect class="chip" x="60" y="168" width="118" height="42" rx="6"/>
+            <text class="lbl-title" x="119" y="193" text-anchor="middle">gesture</text>
+            <rect class="chip" x="188" y="168" width="118" height="42" rx="6"/>
+            <text class="lbl-title" x="247" y="193" text-anchor="middle">command</text>
+            <rect class="chip" x="316" y="168" width="118" height="42" rx="6"/>
+            <text class="lbl-title" x="375" y="193" text-anchor="middle">safety</text>
+            <rect class="chip" x="444" y="168" width="118" height="42" rx="6"/>
+            <text class="lbl-title" x="503" y="193" text-anchor="middle">motion</text>
+            <rect class="chip" x="572" y="168" width="118" height="42" rx="6"/>
+            <text class="lbl-title" x="631" y="193" text-anchor="middle">calibration</text>
+          </g>
+
+          <g>
+            <rect class="chip" x="70" y="275" width="300" height="40" rx="6"/>
+            <text class="lbl-title" x="220" y="299" text-anchor="middle">HandLandmarkStream</text>
+            <rect class="chip" x="390" y="275" width="300" height="40" rx="6"/>
+            <text class="lbl-title" x="540" y="299" text-anchor="middle">TrackerStatus / FrameRateMeter</text>
+          </g>
+
+          <defs>
+            <marker id="ah1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="var(--line)"/>
+            </marker>
+          </defs>
+          <line class="edge" x1="380" y1="120" x2="380" y2="138" marker-end="url(#ah1)"/>
+          <text class="lbl-mono" x="398" y="134">depends on</text>
+          <line class="edge" x1="380" y1="230" x2="380" y2="248" marker-end="url(#ah1)"/>
+          <text class="lbl-mono" x="398" y="244">depends on</text>
+        </svg>
+      </div>
+      <figcaption><b>Gambar 1.</b> Panah menurun menandai satu-satunya arah dependensi yang diizinkan: presentation tidak pernah diakses balik oleh domain atau data.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 02 PIPELINE -->
+  <section class="sheet-section" id="pipeline">
+    <div class="sec-head"><span class="idx">02</span><h2>Pipeline Persepsi &rarr; Kendali</h2></div>
+    <p class="sec-prose">
+      Dua clock berjalan terpisah, sengaja. <b>Jalur persepsi</b> (kiri garis putus-putus) berdenyut
+      mengikuti FPS kamera dan hanya menghasilkan snapshot &mdash; tidak ada keputusan gerak di sana.
+      <b>Loop kendali</b> (kanan) berdenyut tetap <code>16 ms</code> (60&nbsp;Hz), membaca snapshot
+      terakhir setiap tick. Kalau kamera macet, loop kendali tetap jalan dan akan menyimpulkan
+      &ldquo;tangan hilang&rdquo; &mdash; robot tidak pernah terjebak mengulang perintah lama selamanya.
+    </p>
+    <figure>
+      <div class="diagram-frame">
+        <svg viewBox="0 0 1580 420" width="1580" role="img"
+             aria-label="Pipeline dua clock: jalur persepsi (kamera, smoothing, klasifikasi, skor, stabilisasi, deteksi darurat) menulis ke buffer Snapshot yang dibaca setiap 16 milidetik oleh loop kendali (state machine, interpreter, safety gate, motion engine, render).">
+          <defs>
+            <marker id="ah2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="var(--line)"/>
+            </marker>
+            <marker id="ah2c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="var(--critical)"/>
+            </marker>
+          </defs>
+
+          <line class="divider" x1="795" y1="20" x2="795" y2="340"/>
+          <text class="lbl-lane" x="400" y="26" text-anchor="middle">JALUR PERSEPSI &middot; ikuti FPS kamera (variabel)</text>
+          <text class="lbl-lane" x="1190" y="26" text-anchor="middle">LOOP KENDALI &middot; tick tetap 16&nbsp;ms</text>
+
+          <!-- main chain -->
+          <g font-family="inherit">
+            <rect class="box" x="70" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="129" y="134" text-anchor="middle">Kamera</text>
+            <text class="lbl-sub" x="129" y="150" text-anchor="middle">CameraX + MediaPipe</text>
+
+            <rect class="box" x="218" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="277" y="134" text-anchor="middle">Smoothing</text>
+            <text class="lbl-sub" x="277" y="150" text-anchor="middle">EMA &alpha;=0.55</text>
+
+            <rect class="box" x="366" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="425" y="134" text-anchor="middle">Klasifikasi</text>
+            <text class="lbl-sub" x="425" y="150" text-anchor="middle">pola jari &rarr; aksi</text>
+
+            <rect class="box" x="514" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="573" y="134" text-anchor="middle">Stabilisasi</text>
+            <text class="lbl-sub" x="573" y="150" text-anchor="middle">lock &ge;0.85, 300ms</text>
+
+            <rect class="box-accent" x="662" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="721" y="134" text-anchor="middle">Snapshot</text>
+            <text class="lbl-sub" x="721" y="150" text-anchor="middle">buffer handoff</text>
+
+            <rect class="box" x="810" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="869" y="134" text-anchor="middle">State Machine</text>
+            <text class="lbl-sub" x="869" y="150" text-anchor="middle">HaltMode</text>
+
+            <rect class="box" x="958" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="1017" y="134" text-anchor="middle">Interpreter</text>
+            <text class="lbl-sub" x="1017" y="150" text-anchor="middle">RobotCommand</text>
+
+            <rect class="box" x="1106" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="1165" y="134" text-anchor="middle">Safety Gate</text>
+            <text class="lbl-sub" x="1165" y="150" text-anchor="middle">verdict final</text>
+
+            <rect class="box" x="1254" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="1313" y="134" text-anchor="middle">Motion Engine</text>
+            <text class="lbl-sub" x="1313" y="150" text-anchor="middle">RobotState</text>
+
+            <rect class="box" x="1402" y="110" width="118" height="58" rx="8"/>
+            <text class="lbl-title" x="1461" y="134" text-anchor="middle">Render</text>
+            <text class="lbl-sub" x="1461" y="150" text-anchor="middle">Filament 3D / 2D</text>
+          </g>
+
+          <!-- connectors -->
+          <line class="edge" x1="188" y1="139" x2="216" y2="139" marker-end="url(#ah2)"/>
+          <line class="edge" x1="336" y1="139" x2="364" y2="139" marker-end="url(#ah2)"/>
+          <line class="edge" x1="484" y1="139" x2="512" y2="139" marker-end="url(#ah2)"/>
+          <line class="edge" x1="632" y1="139" x2="660" y2="139" marker-end="url(#ah2)"/>
+          <line class="edge" x1="780" y1="139" x2="808" y2="139" marker-end="url(#ah2)"/>
+          <line class="edge" x1="928" y1="139" x2="956" y2="139" marker-end="url(#ah2)"/>
+          <line class="edge" x1="1076" y1="139" x2="1104" y2="139" marker-end="url(#ah2)"/>
+          <line class="edge" x1="1224" y1="139" x2="1252" y2="139" marker-end="url(#ah2)"/>
+          <line class="edge" x1="1372" y1="139" x2="1400" y2="139" marker-end="url(#ah2)"/>
+
+          <!-- emergency branch -->
+          <rect class="box-critical" x="345" y="240" width="160" height="50" rx="8"/>
+          <text class="lbl-title" x="425" y="261" text-anchor="middle">Deteksi Darurat</text>
+          <text class="lbl-sub" x="425" y="276" text-anchor="middle">fist+thumb, 1000ms</text>
+          <line class="edge-critical" x1="425" y1="168" x2="425" y2="238" marker-end="url(#ah2c)"/>
+          <path class="edge-critical" d="M505,265 L 721,265 L 721,170" marker-end="url(#ah2c)"/>
+          <text class="lbl-mono" x="440" y="255">emergencyTriggered</text>
+
+          <text class="lbl-mono" x="721" y="195" text-anchor="middle">ditulis kamera,</text>
+          <text class="lbl-mono" x="721" y="207" text-anchor="middle">dibaca tiap tick</text>
+
+          <text class="lbl-mono" x="1165" y="195" text-anchor="middle">gerbang independen</text>
+          <text class="lbl-mono" x="1165" y="207" text-anchor="middle">kedua &mdash; bisa paksa 0</text>
+        </svg>
+      </div>
+      <figcaption><b>Gambar 2.</b> <code>Snapshot</code> (oranye) adalah satu-satunya titik temu antara dua clock: jalur persepsi menulisnya kapan saja, loop kendali membacanya sekali setiap 16&nbsp;ms. Deteksi darurat berjalan paralel dengan klasifikasi biasa dan ikut menumpang ke snapshot yang sama.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 03 KESELAMATAN -->
+  <section class="sheet-section" id="keselamatan">
+    <div class="sec-head"><span class="idx">03</span><h2>Gerbang Keselamatan &amp; Emergency Latch</h2></div>
+    <p class="sec-prose">
+      Dua sumber pemicu (gestur atau tombol) digabung lewat <code>OR</code>, lalu perintah berhenti
+      ditegakkan <b>dua kali secara independen</b> &mdash; sekali oleh interpreter, sekali lagi oleh
+      safety controller &mdash; sebelum menyentuh motion engine. Latch <code>EMERGENCY_STOP</code>
+      hanya bisa lepas lewat satu jalan: <code>resetRobot()</code>.
+    </p>
+    <figure>
+      <div class="diagram-frame">
+        <svg viewBox="0 0 1180 340" width="1180" role="img"
+             aria-label="Gestur darurat atau tombol emergency stop keduanya memicu state machine mengunci EMERGENCY_STOP. Interpreter dan safety controller secara independen memaksa command menjadi nol sebelum motion engine. Reset robot adalah satu-satunya jalan melepas kunci.">
+          <defs>
+            <marker id="ah3" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="var(--line)"/>
+            </marker>
+            <marker id="ah3a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="var(--accent-ink)"/>
+            </marker>
+          </defs>
+
+          <rect class="box-critical" x="30" y="30" width="220" height="50" rx="8"/>
+          <text class="lbl-title" x="140" y="51" text-anchor="middle">Gestur Darurat</text>
+          <text class="lbl-sub" x="140" y="66" text-anchor="middle">kamera &middot; fist+thumb, 1000ms</text>
+
+          <rect class="box-critical" x="30" y="120" width="220" height="50" rx="8"/>
+          <text class="lbl-title" x="140" y="141" text-anchor="middle">Tombol Emergency Stop</text>
+          <text class="lbl-sub" x="140" y="156" text-anchor="middle">UI &middot; CenterActionDeck</text>
+
+          <circle cx="308" cy="105" r="22" class="box"/>
+          <text class="lbl-title" x="308" y="110" text-anchor="middle">OR</text>
+
+          <line class="edge" x1="250" y1="55" x2="290" y2="95" marker-end="url(#ah3)"/>
+          <line class="edge" x1="250" y1="145" x2="290" y2="115" marker-end="url(#ah3)"/>
+
+          <rect class="box" x="360" y="80" width="230" height="50" rx="8"/>
+          <text class="lbl-title" x="475" y="101" text-anchor="middle">State Machine</text>
+          <text class="lbl-sub" x="475" y="116" text-anchor="middle">latch HaltMode.EMERGENCY_STOP</text>
+          <line class="edge" x1="330" y1="105" x2="358" y2="105" marker-end="url(#ah3)"/>
+
+          <rect class="box" x="660" y="20" width="230" height="50" rx="8"/>
+          <text class="lbl-title" x="775" y="41" text-anchor="middle">Interpreter</text>
+          <text class="lbl-sub" x="775" y="56" text-anchor="middle">paksa command &rarr; 0</text>
+
+          <rect class="box" x="660" y="120" width="230" height="60" rx="8"/>
+          <text class="lbl-title" x="775" y="145" text-anchor="middle">Safety Controller</text>
+          <text class="lbl-sub" x="775" y="160" text-anchor="middle">command.halted() &mdash; independen</text>
+
+          <line class="edge" x1="590" y1="95" x2="658" y2="50" marker-end="url(#ah3)"/>
+          <line class="edge" x1="590" y1="115" x2="658" y2="150" marker-end="url(#ah3)"/>
+
+          <rect class="box" x="950" y="80" width="200" height="50" rx="8"/>
+          <text class="lbl-title" x="1050" y="101" text-anchor="middle">Motion Engine</text>
+          <text class="lbl-sub" x="1050" y="116" text-anchor="middle">hanya terima command nol</text>
+
+          <line class="edge" x1="890" y1="45" x2="948" y2="100" marker-end="url(#ah3)"/>
+          <line class="edge" x1="890" y1="150" x2="948" y2="112" marker-end="url(#ah3)"/>
+
+          <rect class="box" x="950" y="205" width="200" height="55" rx="8"/>
+          <text class="lbl-title" x="1050" y="228" text-anchor="middle">UI: Banner HALT</text>
+          <text class="lbl-sub" x="1050" y="243" text-anchor="middle">+ tombol RESET ROBOT</text>
+          <line class="edge" x1="1050" y1="130" x2="1050" y2="203" marker-end="url(#ah3)"/>
+
+          <path class="edge-dashed" d="M950,232 C 740,320 560,280 480,132" marker-end="url(#ah3a)"/>
+          <text class="lbl-mono" x="620" y="305">resetRobot() &mdash; satu-satunya jalan keluar latch</text>
+        </svg>
+      </div>
+      <figcaption><b>Gambar 3.</b> Interpreter dan Safety Controller menegakkan &ldquo;command = 0&rdquo; di dua tempat berbeda secara independen (defense-in-depth) &mdash; keduanya harus gagal bersamaan supaya robot tetap bergerak saat halted.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 04 KALIBRASI -->
+  <section class="sheet-section" id="kalibrasi">
+    <div class="sec-head"><span class="idx">04</span><h2>Kalibrasi</h2></div>
+    <p class="sec-prose">
+      Wizard 6 langkah merekam &ge;12 sampel per langkah dan menghitung <code>CalibrationProfile</code>
+      baru. Diagram ini menggambarkan alur <b>apa adanya di kode saat ini</b>, termasuk satu mata
+      rantai yang terputus &mdash; ditandai merah &mdash; yang membuat hasil kalibrasi tidak pernah
+      sampai ke pipeline yang sedang berjalan (detail: <code>AUDIT_INCOMPLETE.md #2</code>).
+    </p>
+    <figure>
+      <div class="diagram-frame">
+        <svg viewBox="0 0 900 360" width="900" role="img"
+             aria-label="Enam langkah wizard kalibrasi CENTER, UP, DOWN, LEFT, RIGHT, FIST menghasilkan profil kalibrasi terhitung, tetapi tautan dari profil terhitung ke pipeline aktif terputus dan ditandai sebagai bug.">
+          <defs>
+            <marker id="ah4" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="var(--line)"/>
+            </marker>
+            <marker id="ah4d" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="var(--critical)"/>
+            </marker>
+          </defs>
+
+          <g>
+            <rect class="chip" x="75" y="40" width="110" height="46" rx="6"/>
+            <text class="lbl-title" x="130" y="68" text-anchor="middle">CENTER</text>
+            <rect class="chip" x="203" y="40" width="110" height="46" rx="6"/>
+            <text class="lbl-title" x="258" y="68" text-anchor="middle">UP</text>
+            <rect class="chip" x="331" y="40" width="110" height="46" rx="6"/>
+            <text class="lbl-title" x="386" y="68" text-anchor="middle">DOWN</text>
+            <rect class="chip" x="459" y="40" width="110" height="46" rx="6"/>
+            <text class="lbl-title" x="514" y="68" text-anchor="middle">LEFT</text>
+            <rect class="chip" x="587" y="40" width="110" height="46" rx="6"/>
+            <text class="lbl-title" x="642" y="68" text-anchor="middle">RIGHT</text>
+            <rect class="chip" x="715" y="40" width="110" height="46" rx="6"/>
+            <text class="lbl-title" x="770" y="68" text-anchor="middle">FIST</text>
+          </g>
+          <line class="edge" x1="185" y1="63" x2="201" y2="63" marker-end="url(#ah4)"/>
+          <line class="edge" x1="313" y1="63" x2="329" y2="63" marker-end="url(#ah4)"/>
+          <line class="edge" x1="441" y1="63" x2="457" y2="63" marker-end="url(#ah4)"/>
+          <line class="edge" x1="569" y1="63" x2="585" y2="63" marker-end="url(#ah4)"/>
+          <line class="edge" x1="697" y1="63" x2="713" y2="63" marker-end="url(#ah4)"/>
+          <text class="lbl-mono" x="130" y="30">&ge;12 sampel / langkah</text>
+
+          <line class="edge" x1="770" y1="86" x2="762" y2="148" marker-end="url(#ah4)"/>
+          <rect class="box" x="650" y="150" width="220" height="54" rx="8"/>
+          <text class="lbl-title" x="760" y="172" text-anchor="middle">Profil Kalibrasi Dihitung</text>
+          <text class="lbl-sub" x="760" y="187" text-anchor="middle">CalibrationRecorder.build()</text>
+
+          <line class="edge-dashed" x1="760" y1="204" x2="760" y2="278" marker-end="url(#ah4d)"/>
+          <rect class="box" x="650" y="280" width="220" height="54" rx="8"/>
+          <text class="lbl-title" x="760" y="302" text-anchor="middle">Pipeline Aktif</text>
+          <text class="lbl-sub" x="760" y="317" text-anchor="middle">classifier / interpreter</text>
+
+          <line class="edge-critical" x1="746" y1="228" x2="774" y2="256"/>
+          <line class="edge-critical" x1="774" y1="228" x2="746" y2="256"/>
+          <text class="crit-text" x="60" y="245">tidak pernah diterapkan &mdash; ambang batas tetap default</text>
+        </svg>
+      </div>
+      <figcaption><b>Gambar 4.</b> Simpang merah menandai perilaku nyata di kode: <code>calibrationProfile</code> tersimpan di ViewModel tapi <code>classifier</code>/<code>interpreter</code> yang aktif sudah terlanjur dikonstruksi dengan config lama dan tidak pernah dibangun ulang.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 05 MANUAL -->
+  <section class="sheet-section" id="manual">
+    <div class="sec-head"><span class="idx">05</span><h2>Kontrol Manual</h2></div>
+    <p class="sec-prose">
+      Jalur fallback saat kamera tak tersedia (iOS/Desktop) atau untuk override cepat. Sekali kartu
+      gestur di-tap, aksinya tersimpan dan diprioritaskan di atas kamera <b>setiap tick</b> &mdash;
+      digambar sebagai lingkar-balik (self-loop) karena memang begitu perilakunya di kode
+      (detail: <code>AUDIT_INCOMPLETE.md #4</code>).
+    </p>
+    <figure>
+      <div class="diagram-frame">
+        <svg viewBox="0 0 860 340" width="860" role="img"
+             aria-label="Tap kartu gestur menyimpan manualAction yang diprioritaskan di atas kamera setiap tick dalam lingkar balik, karena fungsi pelepasannya tidak pernah dipanggil dari UI. Satu-satunya jalan keluar adalah emergency stop atau reset.">
+          <defs>
+            <marker id="ah5" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="var(--line)"/>
+            </marker>
+            <marker id="ah5c" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="var(--critical)"/>
+            </marker>
+          </defs>
+
+          <rect class="box" x="30" y="110" width="170" height="56" rx="8"/>
+          <text class="lbl-title" x="115" y="134" text-anchor="middle">Tap Kartu Gestur</text>
+          <text class="lbl-sub" x="115" y="150" text-anchor="middle">PetaGesturGrid</text>
+          <line class="edge" x1="200" y1="138" x2="248" y2="138" marker-end="url(#ah5)"/>
+
+          <rect class="box" x="250" y="110" width="220" height="56" rx="8"/>
+          <text class="lbl-title" x="360" y="134" text-anchor="middle">onManualActionPressed()</text>
+          <text class="lbl-sub" x="360" y="150" text-anchor="middle">ViewModel</text>
+          <line class="edge" x1="470" y1="138" x2="518" y2="138" marker-end="url(#ah5)"/>
+
+          <rect class="box-critical" x="520" y="110" width="200" height="56" rx="8"/>
+          <text class="lbl-title" x="620" y="134" text-anchor="middle">manualAction tersimpan</text>
+          <text class="lbl-sub" x="620" y="150" text-anchor="middle">dipakai tiap tick()</text>
+
+          <path class="edge-critical" d="M600,110 C 600,40 660,40 660,110" marker-end="url(#ah5c)"/>
+          <text class="crit-text" x="560" y="30">diprioritaskan &gt; kamera, setiap 16ms</text>
+          <text class="crit-text" x="520" y="200">&#9888; onManualActionReleased() tidak pernah</text>
+          <text class="crit-text" x="520" y="214">dipanggil dari Composable manapun</text>
+
+          <rect class="box" x="520" y="250" width="200" height="50" rx="8"/>
+          <text class="lbl-title" x="620" y="271" text-anchor="middle">Emergency Stop / Reset</text>
+          <text class="lbl-sub" x="620" y="286" text-anchor="middle">satu-satunya jalan keluar</text>
+          <line class="edge" x1="620" y1="250" x2="620" y2="168" marker-end="url(#ah5)"/>
+          <text class="lbl-mono" x="640" y="235">manualAction = null</text>
+        </svg>
+      </div>
+      <figcaption><b>Gambar 5.</b> Lingkar merah di atas kotak &ldquo;manualAction tersimpan&rdquo; bukan hiasan &mdash; itu satu-satunya cara jujur menggambar perilaku &ldquo;terkunci sampai direset&rdquo; yang ada di kode hari ini.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 06 PLATFORM -->
+  <section class="sheet-section" id="platform">
+    <div class="sec-head"><span class="idx">06</span><h2>Dukungan Platform</h2></div>
+    <p class="sec-prose">
+      Satu basis kode, satu layar (<code>RobotControlScreen</code>) untuk ketiga platform &mdash;
+      yang berbeda hanya implementasi <code>actual CameraFeed</code>.
+    </p>
+    <table class="platform">
+      <thead>
+        <tr><th>Kemampuan</th><th>Android</th><th>Desktop (JVM)</th><th>iOS</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>Dashboard, safety, motion, kalibrasi</th>
+          <td><span class="tag tag-ok">ada</span></td>
+          <td><span class="tag tag-ok">ada</span></td>
+          <td><span class="tag tag-ok">ada</span></td>
+        </tr>
+        <tr>
+          <th>Render 3D (Filament)</th>
+          <td><span class="tag tag-ok">ada</span></td>
+          <td><span class="tag tag-ok">ada</span></td>
+          <td><span class="tag tag-ok">ada</span></td>
+        </tr>
+        <tr>
+          <th>Kamera + hand tracking</th>
+          <td><span class="tag tag-ok">CameraX + MediaPipe</span></td>
+          <td><span class="tag tag-no">stub placeholder</span></td>
+          <td><span class="tag tag-no">stub placeholder</span></td>
+        </tr>
+        <tr>
+          <th>Fallback tanpa kamera</th>
+          <td>kontrol manual (lihat &sect;05)</td>
+          <td>kontrol manual (satu-satunya jalur input)</td>
+          <td>kontrol manual (satu-satunya jalur input)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <span>Dibuat dari pembacaan langsung source code, bukan asumsi.</span>
+    <span>Untuk daftar lengkap temuan &amp; rekomendasi &rarr; <code>docs/AUDIT_INCOMPLETE.md</code></span>
+    <span>Untuk skenario uji manual &rarr; <code>docs/TEST_CASES.md</code></span>
+  </footer>
+
+</div>
