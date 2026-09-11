@@ -39,6 +39,8 @@ import com.experimental.robot.presentation.viewmodel.RobotUiState
  * cepat, dan apakah sistem benar-benar sudah menerima perintahnya. Sisanya teknis
  * dan tinggal di [TelemetryPanel].
  */
+// TODO(AUDIT_INCOMPLETE.md #5): tidak dipanggil dari layar manapun — RobotControlScreen memakai
+// implementasi inline sendiri (CenterActionDeck di DashboardComponents.kt) untuk info yang sama.
 @Composable
 fun ActionBadge(state: RobotUiState, modifier: Modifier = Modifier) {
     val accent = if (state.halt.blocksMovement) {
@@ -177,6 +179,8 @@ private fun ProgressMeter(progress: Float, color: Color, modifier: Modifier = Mo
  * mendiagnosis apa pun - ketika angkanya turun, camera vs detection vs render
  * menunjukkan tahap mana yang jadi hambatan.
  */
+// TODO(AUDIT_INCOMPLETE.md #5): tidak dipanggil dari layar manapun — RobotControlScreen memakai
+// TelemetryCard (DashboardComponents.kt) sebagai gantinya.
 @Composable
 fun TelemetryPanel(state: RobotUiState, modifier: Modifier = Modifier) {
     Column(
@@ -263,6 +267,8 @@ private fun FingerChip(name: String, extended: Boolean) {
 }
 
 /** Daftar pemetaan gestur -> aksi, sekaligus penanda aksi yang sedang aktif. */
+// TODO(AUDIT_INCOMPLETE.md #5): tidak dipanggil dari layar manapun — RobotControlScreen memakai
+// PetaGesturGrid (DashboardComponents.kt) sebagai gantinya.
 @Composable
 fun GestureLegend(activeAction: RobotAction, modifier: Modifier = Modifier) {
     Column(
@@ -309,6 +315,8 @@ fun GestureLegend(activeAction: RobotAction, modifier: Modifier = Modifier) {
 }
 
 /** Tombol pindah visualisasi 3D <-> 2D. */
+// TODO(AUDIT_INCOMPLETE.md #5): tidak dipanggil dari layar manapun — RobotControlScreen memakai
+// toggle 2D/3D di ModeAndViewCard (DashboardComponents.kt) sebagai gantinya.
 @Composable
 fun RenderModeToggle(
     mode: RobotRenderMode,
@@ -340,6 +348,10 @@ fun RenderModeToggle(
  * skala robot itu sendiri — sehingga aman dipanggil berkali-kali tanpa memengaruhi
  * hasil klasifikasi gestur maupun motion engine.
  */
+// TODO(AUDIT_INCOMPLETE.md #5): komponen ini sudah lengkap dan RobotControlViewModel.zoomIn()/
+// zoomOut() sudah berfungsi penuh — tapi Composable ini tidak pernah dirender di
+// RobotControlScreen.kt, jadi fitur zoom panggung 3D sepenuhnya tidak bisa diakses pengguna.
+// Effort kecil untuk menyambungkan, payoff langsung karena logikanya sudah 100% siap.
 @Composable
 fun ZoomControls(
     onZoomIn: () -> Unit,
@@ -388,6 +400,8 @@ private fun ZoomButton(label: String, onTap: () -> Unit) {
 }
 
 /** Banner status pipeline (izin kamera, error model, platform tanpa kamera). */
+// TODO(AUDIT_INCOMPLETE.md #5): tidak dipanggil dari layar manapun — status tracker ditampilkan
+// lewat jalur lain di KameraPreviewCard (DashboardComponents.kt).
 @Composable
 fun StatusBanner(status: TrackerStatus, modifier: Modifier = Modifier) {
     val message = when (status) {

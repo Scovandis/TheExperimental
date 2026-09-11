@@ -70,6 +70,7 @@ fun RobotControlScreen(
 
         Column(modifier = Modifier.fillMaxSize()) {
             // 1. Top Dashboard Header Bar
+            // TODO(AUDIT_INCOMPLETE.md #6): ikon Settings & Menu belum ada aksi nyata di baliknya.
             TopDashboardBar(
                 state = state,
                 onSettingsClick = { /* Settings dialog/action */ },
@@ -139,6 +140,9 @@ fun RobotControlScreen(
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        // TODO(AUDIT_INCOMPLETE.md #4): hanya onManualActionPressed yang dipanggil;
+                        // viewModel.onManualActionReleased() tidak pernah terpanggil dari sini,
+                        // jadi satu tap mengunci override manual sampai Emergency Stop/Reset.
                         PetaGesturGrid(
                             activeAction = state.stableAction,
                             onGestureClick = { action ->
@@ -150,6 +154,8 @@ fun RobotControlScreen(
                             state = state,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        // TODO(AUDIT_INCOMPLETE.md #3): onSelectSimulation/onSelectRealRobot tidak
+                        // diisi di sini — pill "Simulation/Real Robot" jadi murni kosmetik.
                         ModeAndViewCard(
                             state = state,
                             onToggleRenderMode = viewModel::toggleRenderMode,
@@ -190,6 +196,8 @@ fun RobotControlScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
+                    // TODO(AUDIT_INCOMPLETE.md #4): sama seperti versi wide-screen di atas — tap
+                    // sekali mengunci override manual karena onManualActionReleased() tak dipanggil.
                     PetaGesturGrid(
                         activeAction = state.stableAction,
                         onGestureClick = { action -> viewModel.onManualActionPressed(action) },
@@ -206,6 +214,8 @@ fun RobotControlScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
+                    // TODO(AUDIT_INCOMPLETE.md #3): sama seperti versi wide-screen — pill
+                    // "Simulation/Real Robot" tidak tersambung ke ViewModel, murni kosmetik.
                     ModeAndViewCard(
                         state = state,
                         onToggleRenderMode = viewModel::toggleRenderMode,
@@ -217,6 +227,8 @@ fun RobotControlScreen(
             }
 
             // 3. Bottom Navigation Dock
+            // TODO(AUDIT_INCOMPLETE.md #7): hanya tab "Calibration" yang memicu aksi nyata di
+            // sini — Home/Record/Replay/Settings cuma mengganti label currentTab.
             BottomNavigationDock(
                 currentTab = currentTab,
                 onTabSelect = { tab ->

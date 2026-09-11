@@ -33,6 +33,8 @@ import com.experimental.robot.presentation.viewmodel.RobotUiState
  * Selalu terlihat, tidak pernah disembunyikan di balik menu, dan tidak pernah dinonaktifkan.
  * Sebuah tombol berhenti yang bisa hilang bukan tombol berhenti.
  */
+// TODO(AUDIT_INCOMPLETE.md #5): tidak dipanggil dari layar manapun — RobotControlScreen memakai
+// tombol EMERGENCY STOP inline di CenterActionDeck (DashboardComponents.kt) sebagai gantinya.
 @Composable
 fun EmergencyStopButton(
     onEmergencyStop: () -> Unit,
@@ -62,6 +64,8 @@ fun EmergencyStopButton(
  * Emergency stop dan safety lock sengaja tidak bisa pulih sendiri, jadi UI harus
  * menyediakan satu-satunya jalan keluarnya secara eksplisit.
  */
+// TODO(AUDIT_INCOMPLETE.md #5): tidak dipanggil dari layar manapun — RobotControlScreen memakai
+// banner HALT inline (RobotControlScreen.kt, blok "Alert Banner") sebagai gantinya.
 @Composable
 fun SafetyBanner(
     state: RobotUiState,
@@ -204,6 +208,8 @@ private fun CalibrationButton(label: String, enabled: Boolean, onTap: () -> Unit
 }
 
 /** Tombol memulai wizard kalibrasi. */
+// TODO(AUDIT_INCOMPLETE.md #5): tidak dipanggil dari layar manapun — RobotControlScreen memicu
+// startCalibration() lewat tab "Calibration" di BottomNavigationDock, bukan lewat tombol ini.
 @Composable
 fun CalibrationLauncher(onStart: () -> Unit, modifier: Modifier = Modifier) {
     Box(

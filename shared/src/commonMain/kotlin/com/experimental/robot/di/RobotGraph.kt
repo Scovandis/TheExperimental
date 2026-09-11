@@ -36,10 +36,18 @@ object RobotGraph {
 
     private val repository: HandTrackingRepository get() = handLandmarkStream
 
-    /** Ambang batas gestur, sudah digeser profil kalibrasi bila ada. */
+    /**
+     * Ambang batas gestur, sudah digeser profil kalibrasi bila ada.
+     *
+     * TODO(AUDIT_INCOMPLETE.md #2): tidak ada pemanggil yang pernah menulis ke var ini setelah
+     * wizard kalibrasi selesai — [RobotControlViewModel.finishCalibration] menyimpan hasilnya ke
+     * variabel lokal miliknya sendiri, bukan ke sini. Selama itu belum diperbaiki, nilai default
+     * ini adalah satu-satunya profil yang pernah benar-benar dipakai.
+     */
     var calibration: CalibrationProfile = CalibrationProfile.DEFAULT
 
     fun createRobotControlViewModel(): RobotControlViewModel {
+        // Diterapkan hanya sekali di sini, saat ViewModel dibuat — lihat TODO pada [calibration].
         val gestureConfig = calibration.applyTo(GestureConfig())
         val controlSpaceConfig = calibration.applyTo(ControlSpaceConfig())
 

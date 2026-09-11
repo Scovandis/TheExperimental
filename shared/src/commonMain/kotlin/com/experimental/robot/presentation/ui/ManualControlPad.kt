@@ -1,3 +1,8 @@
+// TODO(AUDIT_INCOMPLETE.md #4, #5): seluruh file ini tidak dipanggil dari layar manapun.
+// RobotControlScreen.kt memakai PetaGesturGrid (DashboardComponents.kt) sebagai gantinya, yang
+// hanya tap-sekali (.clickable) sehingga onManualActionReleased() tidak pernah terpanggil dan
+// override manual mengunci permanen. Pad di file ini sudah punya pola press-and-hold yang benar
+// (onPress/tryAwaitRelease di bawah) — solusi siap pakai untuk bug tersebut, tinggal disambungkan.
 package com.experimental.robot.presentation.ui
 
 import androidx.compose.foundation.background

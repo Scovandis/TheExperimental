@@ -65,7 +65,15 @@ class RobotControlViewModel(
     private val _uiState = MutableStateFlow(RobotUiState())
     val uiState: StateFlow<RobotUiState> = _uiState.asStateFlow()
 
-    /** Profil kalibrasi aktif; diterapkan ke ambang batas lewat [RobotGraph]. */
+    /**
+     * Profil kalibrasi aktif; diterapkan ke ambang batas lewat [RobotGraph].
+     *
+     * TODO(AUDIT_INCOMPLETE.md #2): "diterapkan lewat RobotGraph" ini belum benar terjadi —
+     * [finishCalibration] hanya menulis ke variabel lokal ini, tidak pernah menulis balik ke
+     * [RobotGraph.calibration] maupun membangun ulang [classifier]/[interpreter] yang sudah
+     * dikonstruksi dengan config lama. Hasil wizard kalibrasi saat ini tidak berefek sama sekali
+     * pada pipeline gestur yang sedang berjalan.
+     */
     var calibrationProfile: CalibrationProfile = CalibrationProfile.DEFAULT
         private set
 
@@ -225,6 +233,10 @@ class RobotControlViewModel(
             signals = SafetySignals(
                 confidence = perception.confidence,
                 detectionFps = _uiState.value.frameRates.detection,
+                // TODO(AUDIT_INCOMPLETE.md #3): hardcoded false — tidak ada jalur kode yang
+                // pernah mengubahnya jadi true, jadi gerbang link/baterai/timeout/obstacle di
+                // SafetyController selalu di-short-circuit ke RUNNING. Toggle "Real Robot" di UI
+                // tidak sampai ke sini.
                 requireRobotLink = false,
             ),
             nowMs = now,
@@ -253,6 +265,11 @@ class RobotControlViewModel(
         _uiState.update { it.copy(manualOverride = true, stableAction = action) }
     }
 
+    // TODO(AUDIT_INCOMPLETE.md #4): fungsi ini tidak pernah dipanggil dari UI manapun
+    // (PetaGesturGrid hanya memanggil onManualActionPressed lewat .clickable tap-sekali).
+    // Akibatnya manualAction tidak pernah null lagi lewat jalur normal — override manual
+    // mengunci permanen sampai Emergency Stop/Reset. Sambungkan ke pola press-and-hold
+    // (bandingkan ManualControlPad.kt yang sudah punya onPress/tryAwaitRelease yang benar).
     fun onManualActionReleased() {
         manualAction = null
         _uiState.update { it.copy(manualOverride = false, stableAction = RobotAction.IDLE) }
@@ -336,6 +353,10 @@ class RobotControlViewModel(
         _uiState.update { it.copy(calibration = CalibrationUiState(step = next)) }
     }
 
+    // TODO(AUDIT_INCOMPLETE.md #2): hasil build() di sini hanya menimpa calibrationProfile lokal.
+    // Untuk benar-benar berefek, ini perlu ditulis balik ke RobotGraph.calibration DAN
+    // classifier/interpreter yang dipakai ViewModel perlu dibangun ulang dengan config baru —
+    // keduanya belum terjadi sama sekali di kode saat ini.
     fun finishCalibration() {
         calibrationProfile = calibrationRecorder.build(calibrationProfile)
         calibrationStep = null

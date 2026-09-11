@@ -350,6 +350,7 @@ fun KameraPreviewCard(
 @Composable
 fun TelemetryCard(
     state: RobotUiState,
+    // TODO(AUDIT_INCOMPLETE.md #6): tombol "Detail" tidak pernah diberi callback nyata oleh caller — no-op.
     onDetailClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -764,6 +765,7 @@ fun PetaGesturGrid(
                 )
             }
 
+            // TODO(AUDIT_INCOMPLETE.md #6): tombol "Edit" belum punya aksi — clickable{} kosong.
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
@@ -786,6 +788,12 @@ fun PetaGesturGrid(
             }
         }
 
+        // TODO(AUDIT_INCOMPLETE.md #4): kartu di bawah ini pakai tap sekali (.clickable), hanya
+        // memanggil onManualActionPressed — tidak ada pasangan "released". Di ViewModel,
+        // manualAction yang tersimpan diprioritaskan di atas gestur kamera setiap tick sampai
+        // Emergency Stop/Reset ditekan, jadi satu tap mengunci override secara permanen.
+        // Perbaikan: ganti ke pola press-and-hold (lihat ManualControlPad.kt yang sudah benar
+        // tapi belum dipakai di sini) supaya onManualActionReleased() ikut terpanggil.
         // Baris 1: 3 Kartu (IDLE, MAJU, MUNDUR)
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1058,6 +1066,9 @@ fun GestureAndHandInfoCard(
 fun ModeAndViewCard(
     state: RobotUiState,
     onToggleRenderMode: () -> Unit,
+    // TODO(AUDIT_INCOMPLETE.md #3): RobotControlScreen tidak pernah mengisi kedua callback ini,
+    // jadi defaultnya ({}) yang selalu jalan — toggle di bawah murni kosmetik, tidak pernah
+    // menyentuh SafetySignals.requireRobotLink (hardcoded false di RobotControlViewModel).
     onSelectSimulation: () -> Unit = {},
     onSelectRealRobot: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -1085,6 +1096,8 @@ fun ModeAndViewCard(
         }
 
         // Row 1: Simulation vs Real Robot
+        // TODO(AUDIT_INCOMPLETE.md #3): isSimMode hanya state lokal Compose — tidak pernah
+        // dikirim ke ViewModel/RobotGraph, jadi pilihan ini tidak mengubah perilaku apa pun.
         var isSimMode by remember { mutableStateOf(true) }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1225,6 +1238,10 @@ fun BottomNavigationDock(
                 CrosshairNavIcon(modifier = Modifier.size(15.dp), color = RobotColors.textSecondary)
                 Text(text = "Calibration", color = RobotColors.textSecondary, fontSize = 12.sp)
             }
+
+            // TODO(AUDIT_INCOMPLETE.md #7): tab Record/Replay/Settings di bawah cuma mengubah
+            // label currentTab di RobotControlScreen — tidak ada fitur rekam/replay/pengaturan
+            // di baliknya sama sekali (beda dengan tab "Calibration" di atas yang memang jalan).
 
             // Record
             Row(

@@ -1,3 +1,5 @@
+// TODO(AUDIT_INCOMPLETE.md #1): dead code — lihat catatan lengkap di SoftwareRenderer.kt
+// (package ini tidak dipanggil dari Composable produksi manapun, hanya dari test).
 package com.experimental.robot.presentation.render
 
 import androidx.compose.ui.graphics.Color

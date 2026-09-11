@@ -1,3 +1,10 @@
+// TODO(AUDIT_INCOMPLETE.md #1): dead code — rasterizer software ini (bersama RobotMeshBuilder.kt
+// dan ObjMeshLoader.kt di package yang sama) tidak dipanggil dari Composable produksi manapun.
+// RobotStage (RobotControlScreen.kt) memilih antara Robot3dCanvas (Filament) atau RobotCanvas
+// (Compose Canvas 2D) — keduanya tidak memakai kelas di package ini. Kemungkinan besar ini
+// renderer sebelum migrasi ke Filament yang belum dibersihkan. Hanya dipakai oleh
+// Render3dTest.kt/ObjMeshLoaderTest.kt. Putuskan: hapus, atau sambungkan sebagai mode render
+// ketiga yang benar-benar bisa dipilih user (mis. fallback untuk device tanpa GPU).
 package com.experimental.robot.presentation.render
 
 import androidx.compose.ui.geometry.Offset
