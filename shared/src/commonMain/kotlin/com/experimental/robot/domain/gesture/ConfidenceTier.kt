@@ -12,14 +12,10 @@ data class ConfidenceConfig(
     val candidateFloor: Float = 0.75f,
     /** Syarat keyakinan untuk boleh mengunci gestur baru. */
     val lockFloor: Float = 0.85f,
-    /** Rentang margin ekstensi jari yang memberi skor penuh. */
+    /** Rentang margin ekstensi jari (telunjuk-kelingking) yang memberi skor penuh. */
     val extensionSpan: Float = 0.055f,
-    /** Rentang jarak vertikal pergelangan dari ambang jongkok yang memberi skor penuh. */
-    val crouchSpan: Float = 0.12f,
-    /** Rentang selisih Y telunjuk-pergelangan yang memberi skor penuh untuk MUNDUR. */
-    val pointSpan: Float = 0.06f,
-    /** Rentang kemiringan X di luar dead zone yang memberi skor penuh untuk PUTAR. */
-    val rotateSpan: Float = 0.10f,
+    /** Rentang margin ekstensi jempol (rasio jarak tip-vs-IP ke pergelangan) yang memberi skor penuh. */
+    val thumbSpan: Float = 0.05f,
     /** Dipakai bila detektor tidak menyediakan skor kehadiran tangan. */
     val neutralPresence: Float = 0.90f,
 )

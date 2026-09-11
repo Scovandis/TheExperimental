@@ -20,16 +20,19 @@
 Untuk TC yang melibatkan gestur kamera, gunakan **Android** dengan pencahayaan cukup dan tangan
 kanan menghadap kamera depan (kamera dicerminkan otomatis).
 
-**Definisi gestur** (`HandGestureClassifier.kt`), dipakai sebagai langkah uji:
+**Definisi gestur** (`HandGestureClassifier.kt` + `GesturePattern.kt`), berbasis identitas/jumlah
+jari yang terbuka — seperti berhitung dengan tangan, bukan posisi/kemiringan tangan di frame —
+dipakai sebagai langkah uji:
 
 | Aksi | Pola tangan |
 |---|---|
-| MOVE_FORWARD | Telapak terbuka (≥3 jari), pergelangan di area **atas** frame |
-| CROUCH | Telapak terbuka (≥3 jari), pergelangan di area **bawah** frame |
-| MOVE_BACKWARD | Hanya telunjuk terbuka, ujung jari menunjuk ke bawah |
-| ROTATE_LEFT / ROTATE_RIGHT | Telunjuk + jari tengah terbuka ("V-sign"), condongkan tangan ke kiri/kanan dari titik tengah |
-| IDLE | Kepalan tangan biasa, atau kondisi lain di luar pola di atas |
-| EMERGENCY STOP (gestur) | Kepalan tangan **+ ibu jari terentang**, tahan ±1 detik |
+| MOVE_FORWARD | 1 jari terbuka: telunjuk saja |
+| MOVE_BACKWARD | 2 jari terbuka: telunjuk + tengah |
+| ROTATE_LEFT | 3 jari terbuka: telunjuk + tengah + manis |
+| ROTATE_RIGHT | 4 jari terbuka: telunjuk + tengah + manis + kelingking, **tanpa** jempol |
+| CROUCH | 5 jari terbuka: telapak penuh **termasuk** jempol |
+| IDLE | Kepalan tangan (0 jari), atau kombinasi jari lain di luar pola di atas |
+| EMERGENCY STOP (gestur) | Kepalan tangan **+ ibu jari terentang** (4 jari lain tetap tertutup), tahan ±1 detik |
 
 ---
 
@@ -39,7 +42,7 @@ kanan menghadap kamera depan (kamera dicerminkan otomatis).
 
 - **Precondition:** App Android terbuka, izin kamera diberikan, `RobotStage` menampilkan robot diam (IDLE).
 - **Langkah:**
-  1. Tunjukkan telapak terbuka ke kamera dengan pergelangan tangan di area atas frame, tahan ±0.5 detik.
+  1. Tunjukkan 1 jari (telunjuk saja, jari lain + jempol terlipat) ke kamera, tahan ±0.5 detik.
   2. Amati `GestureAndHandInfoCard` (confidence, aksi stabil) dan `RobotStage`.
 - **Ekspektasi:**
   - Setelah confidence ≥ 0.85 bertahan 300ms, aksi stabil berubah jadi `MOVE_FORWARD`.
@@ -49,20 +52,20 @@ kanan menghadap kamera depan (kamera dicerminkan otomatis).
 
 ### TC-A02 — Deteksi gestur CROUCH
 
-- **Langkah:** Telapak terbuka dengan pergelangan di area bawah frame, tahan ±0.5 detik.
+- **Langkah:** Tunjukkan 5 jari (telapak terbuka penuh, termasuk jempol), tahan ±0.5 detik.
 - **Ekspektasi:** Aksi stabil → `CROUCH`; `RobotState.scaleY` mengecil (robot terlihat merunduk).
 - **Status/Hasil Aktual:** _(isi tester)_
 
 ### TC-A03 — Deteksi gestur MOVE_BACKWARD
 
-- **Langkah:** Hanya telunjuk terbuka, ujung jari menunjuk ke bawah, tahan ±0.5 detik.
+- **Langkah:** Tunjukkan 2 jari (telunjuk + tengah, jari lain + jempol terlipat), tahan ±0.5 detik.
 - **Ekspektasi:** Aksi stabil → `MOVE_BACKWARD`; posisi Z robot berkurang.
 - **Status/Hasil Aktual:** _(isi tester)_
 
 ### TC-A04 — Deteksi gestur ROTATE_LEFT / ROTATE_RIGHT
 
-- **Langkah:** Bentuk V-sign (telunjuk+tengah), condongkan tangan ke kiri lalu ke kanan relatif titik tengah, masing-masing tahan ±0.5 detik.
-- **Ekspektasi:** Aksi stabil berubah `ROTATE_LEFT` saat condong kiri, `ROTATE_RIGHT` saat condong kanan; `rotationY` robot berubah arah sesuai.
+- **Langkah:** Tunjukkan 3 jari (telunjuk+tengah+manis, tanpa jempol) untuk `ROTATE_LEFT`, lalu 4 jari (+ kelingking, tetap tanpa jempol) untuk `ROTATE_RIGHT`, masing-masing tahan ±0.5 detik.
+- **Ekspektasi:** Aksi stabil berubah `ROTATE_LEFT` saat 3 jari, `ROTATE_RIGHT` saat 4 jari; `rotationY` robot berubah arah sesuai.
 - **Status/Hasil Aktual:** _(isi tester)_
 
 ### TC-A05 — Kepalan tangan biasa → IDLE (bukan darurat)

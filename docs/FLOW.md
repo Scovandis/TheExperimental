@@ -90,9 +90,10 @@ flowchart TD
    `LIVE_STREAM`, CPU delegate).
 2. **Buffering & smoothing** — `HandLandmarkStream` menyiarkan `Flow<HandFrame?>` (replay=1,
    drop-oldest) yang di-pipe lewat `LandmarkSmoother` (EMA per landmark).
-3. **Klasifikasi gestur** — `HandGestureClassifier.classify(hand)` mencocokkan pola jari secara
-   berurutan: `CROUCH → MOVE_FORWARD → MOVE_BACKWARD → ROTATE_LEFT/RIGHT → IDLE` (fallback,
-   termasuk kepalan tangan biasa).
+3. **Klasifikasi gestur** — `HandGestureClassifier.classify(hand)` mencocokkan identitas jari yang
+   terbuka ke salah satu pola tetap di `GesturePattern` (seperti berhitung dengan tangan): 0 jari
+   (kepalan) → `IDLE`, 1 → `MOVE_FORWARD`, 2 → `MOVE_BACKWARD`, 3 → `ROTATE_LEFT`, 4 tanpa jempol →
+   `ROTATE_RIGHT`, 5 termasuk jempol → `CROUCH`; kombinasi jari lain jatuh ke `IDLE` (fallback).
 4. **Skoring kepercayaan** — `GestureConfidenceScorer` memberi skor berbasis margin; kejelasan
    jari dihitung dengan `minOf` (bukan rata-rata) sehingga satu jari ambigu menjatuhkan skor
    keseluruhan.
@@ -191,9 +192,12 @@ flowchart LR
     C -->|Cancel| F["cancelCalibration()\nbuang rekaman"]
 ```
 
-Profil kalibrasi (`CalibrationProfile`) dirancang untuk diterapkan ke `GestureConfig` dan
-`ControlSpaceConfig` lewat `applyTo()`, dan secara arsitektural **seharusnya** membuat gestur
-lebih akurat untuk tangan/kondisi pencahayaan pengguna tertentu setelah wizard selesai.
+Profil kalibrasi (`CalibrationProfile`) dirancang untuk diterapkan ke `ControlSpaceConfig` lewat
+`applyTo()` (posisi netral tangan untuk ruang kontrol gerak), dan secara arsitektural
+**seharusnya** membuat kontrol lebih akurat untuk tangan/kondisi pengguna tertentu setelah wizard
+selesai. Klasifikasi gestur (`GestureConfig`) sendiri tidak lagi digeser oleh kalibrasi — sejak
+beralih ke deteksi berbasis identitas jari (`GesturePattern`), tidak ada lagi ambang
+posisi/kemiringan tangan yang perlu disesuaikan per pengguna.
 
 > ⚠️ **Pada implementasi saat ini, hasil kalibrasi tidak pernah kembali ke pipeline yang
 > berjalan** — lihat temuan kritis di

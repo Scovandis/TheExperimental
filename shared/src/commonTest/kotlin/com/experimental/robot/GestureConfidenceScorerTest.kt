@@ -12,20 +12,22 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Tangan sintetis dengan kendali eksplisit atas margin ekstensi tiap jari. */
-private class Hand(private val wristY: Float = 0.4f, private val wristX: Float = 0.5f) {
+/** Tangan sintetis dengan kendali eksplisit atas margin ekstensi tiap jari (termasuk jempol). */
+private class Hand(wristY: Float = 0.4f, wristX: Float = 0.5f) {
     private val points = MutableList(L.TOTAL) { HandPoint(wristX, wristY) }
+    private val thumbRatio = GestureConfig().thumbExtensionRatio
 
     init {
         points[L.WRIST] = HandPoint(wristX, wristY)
         points[L.INDEX_MCP] = HandPoint(wristX - 0.06f, wristY - 0.10f)
         points[L.PINKY_MCP] = HandPoint(wristX + 0.06f, wristY - 0.10f)
+        thumb(margin = -0.08f) // Jempol tertutup secara tegas, kecuali di-override.
     }
 
-    /** @param margin selisih di luar ambang batas; positif = terbuka, negatif = tertutup. */
+    /** @param margin selisih di luar ambang batas ekstensi; positif = terbuka, negatif = tertutup. */
     fun finger(pip: Int, tip: Int, margin: Float, offsetX: Float = 0f) = apply {
-        val x = wristX + offsetX
-        val pipY = wristY - 0.16f
+        val x = points[L.WRIST].x + offsetX
+        val pipY = points[L.WRIST].y - 0.16f
         points[pip] = HandPoint(x, pipY)
         points[tip] = HandPoint(x, pipY - 0.015f - margin)
     }
@@ -37,10 +39,15 @@ private class Hand(private val wristY: Float = 0.4f, private val wristX: Float =
         finger(L.PINKY_PIP, L.PINKY_TIP, margin, offsetX = 0.06f)
     }
 
-    fun indexTip(x: Float, y: Float) = apply { points[L.INDEX_TIP] = HandPoint(x, y) }
+    /** @param margin selisih jarak tip-vs-IP*rasio terhadap pergelangan; positif = jempol terbuka. */
+    fun thumb(margin: Float) = apply {
+        val wrist = points[L.WRIST]
+        val ipDistance = 0.08f
+        points[L.THUMB_IP] = HandPoint(wrist.x + ipDistance, wrist.y)
+        points[L.THUMB_TIP] = HandPoint(wrist.x + ipDistance * thumbRatio + margin, wrist.y)
+    }
 
-    fun build(confidence: Float = 0f) =
-        HandFrame(landmarks = points.toList(), confidence = confidence)
+    fun build(confidence: Float = 0f) = HandFrame(landmarks = points.toList(), confidence = confidence)
 }
 
 class GestureConfidenceScorerTest {
@@ -56,46 +63,36 @@ class GestureConfidenceScorerTest {
     }
 
     @Test
-    fun telapak_terbuka_tegas_di_area_atas_menghasilkan_keyakinan_tinggi() {
-        val hand = Hand(wristY = 0.35f).longFingers(margin = 0.08f).build()
+    fun satu_jari_telunjuk_tegas_menghasilkan_keyakinan_tinggi_untuk_maju() {
+        val hand = Hand()
+            .finger(L.INDEX_PIP, L.INDEX_TIP, margin = 0.08f, offsetX = -0.06f)
+            .finger(L.MIDDLE_PIP, L.MIDDLE_TIP, margin = -0.08f, offsetX = -0.02f)
+            .finger(L.RING_PIP, L.RING_TIP, margin = -0.08f, offsetX = 0.02f)
+            .finger(L.PINKY_PIP, L.PINKY_TIP, margin = -0.08f, offsetX = 0.06f)
+            .build()
 
         val score = scorer.score(hand, RobotAction.MOVE_FORWARD)
 
         assertEquals(ConfidenceTier.LOCKED, ConfidenceTier.of(score, config), "skor $score")
     }
 
-    /**
-     * Yang membedakan skor berbasis margin dari sekadar lolos/tidak: pose yang persis
-     * di perbatasan ambang jongkok tidak boleh pernah terkunci sebagai MAJU.
-     */
     @Test
-    fun telapak_tepat_di_ambang_jongkok_hampir_tidak_punya_keyakinan() {
-        val hand = Hand(wristY = gestureConfig.crouchWristY - 0.005f)
-            .longFingers(margin = 0.08f)
+    fun dua_jari_tegas_menghasilkan_keyakinan_tinggi_untuk_mundur() {
+        val hand = Hand()
+            .finger(L.INDEX_PIP, L.INDEX_TIP, margin = 0.08f, offsetX = -0.06f)
+            .finger(L.MIDDLE_PIP, L.MIDDLE_TIP, margin = 0.08f, offsetX = -0.02f)
+            .finger(L.RING_PIP, L.RING_TIP, margin = -0.08f, offsetX = 0.02f)
+            .finger(L.PINKY_PIP, L.PINKY_TIP, margin = -0.08f, offsetX = 0.06f)
             .build()
 
-        val score = scorer.score(hand, RobotAction.MOVE_FORWARD)
+        val score = scorer.score(hand, RobotAction.MOVE_BACKWARD)
 
-        assertTrue(score < config.unknownCeiling, "pose di perbatasan harus UNKNOWN, dapat $score")
-    }
-
-    @Test
-    fun satu_jari_yang_ragu_ragu_menurunkan_seluruh_keyakinan() {
-        val tegas = Hand(wristY = 0.35f).longFingers(margin = 0.08f).build()
-        val ragu = Hand(wristY = 0.35f)
-            .longFingers(margin = 0.08f)
-            .finger(L.PINKY_PIP, L.PINKY_TIP, margin = 0.002f, offsetX = 0.06f)
-            .build()
-
-        val skorTegas = scorer.score(tegas, RobotAction.MOVE_FORWARD)
-        val skorRagu = scorer.score(ragu, RobotAction.MOVE_FORWARD)
-
-        assertTrue(skorRagu < skorTegas / 2f, "mata rantai terlemah: $skorRagu vs $skorTegas")
+        assertEquals(ConfidenceTier.LOCKED, ConfidenceTier.of(score, config), "skor $score")
     }
 
     @Test
     fun kepalan_tegas_menghasilkan_keyakinan_tinggi_untuk_idle() {
-        val hand = Hand(wristY = 0.4f).longFingers(margin = -0.08f).build()
+        val hand = Hand().longFingers(margin = -0.08f).build()
 
         val score = scorer.score(hand, RobotAction.IDLE)
 
@@ -103,50 +100,84 @@ class GestureConfidenceScorerTest {
     }
 
     @Test
-    fun jongkok_makin_yakin_saat_tangan_makin_rendah() {
-        val tepiAmbang = Hand(wristY = 0.67f).longFingers(margin = 0.08f).build()
-        val jauhKeBawah = Hand(wristY = 0.85f).longFingers(margin = 0.08f).build()
+    fun lima_jari_termasuk_jempol_tegas_menghasilkan_keyakinan_tinggi_untuk_jongkok() {
+        val hand = Hand().longFingers(margin = 0.08f).thumb(margin = 0.08f).build()
 
-        val skorTepi = scorer.score(tepiAmbang, RobotAction.CROUCH)
-        val skorJauh = scorer.score(jauhKeBawah, RobotAction.CROUCH)
+        val score = scorer.score(hand, RobotAction.CROUCH)
 
-        assertTrue(skorTepi < skorJauh, "$skorTepi harus lebih kecil dari $skorJauh")
-        assertEquals(ConfidenceTier.LOCKED, ConfidenceTier.of(skorJauh, config))
+        assertEquals(ConfidenceTier.LOCKED, ConfidenceTier.of(score, config), "skor $score")
+    }
+
+    /**
+     * Yang membedakan skor berbasis margin dari sekadar lolos/tidak: jempol yang persis
+     * di perbatasan ambang ekstensi tidak boleh membuat JONGKOK terkunci.
+     */
+    @Test
+    fun jempol_tepat_di_ambang_ekstensi_membuat_jongkok_tidak_yakin() {
+        val hand = Hand().longFingers(margin = 0.08f).thumb(margin = 0.001f).build()
+
+        val score = scorer.score(hand, RobotAction.CROUCH)
+
+        assertTrue(score < config.unknownCeiling, "jempol di perbatasan harus UNKNOWN, dapat $score")
     }
 
     @Test
-    fun putar_di_dalam_dead_zone_tidak_punya_keyakinan() {
-        val hand = Hand(wristY = 0.4f)
-            .finger(L.INDEX_PIP, L.INDEX_TIP, margin = 0.08f, offsetX = -0.03f)
-            .finger(L.MIDDLE_PIP, L.MIDDLE_TIP, margin = 0.08f, offsetX = 0.01f)
-            .finger(L.RING_PIP, L.RING_TIP, margin = -0.08f, offsetX = 0.03f)
-            .finger(L.PINKY_PIP, L.PINKY_TIP, margin = -0.08f, offsetX = 0.06f)
-            .indexTip(x = 0.51f, y = 0.14f)
+    fun satu_jari_yang_ragu_ragu_menurunkan_seluruh_keyakinan() {
+        val tegas = Hand().longFingers(margin = 0.08f).build()
+        val ragu = Hand()
+            .longFingers(margin = 0.08f)
+            .finger(L.PINKY_PIP, L.PINKY_TIP, margin = 0.002f, offsetX = 0.06f)
             .build()
 
-        val score = scorer.score(hand, RobotAction.ROTATE_RIGHT)
+        val skorTegas = scorer.score(tegas, RobotAction.ROTATE_RIGHT)
+        val skorRagu = scorer.score(ragu, RobotAction.ROTATE_RIGHT)
 
-        assertTrue(score < config.unknownCeiling, "kemiringan 0.01 masih dead zone, dapat $score")
+        assertTrue(skorRagu < skorTegas / 2f, "mata rantai terlemah: $skorRagu vs $skorTegas")
     }
 
+    /**
+     * Jempol tidak diperhitungkan untuk IDLE (lihat KDoc [GesturePattern]) - deteksi gestur
+     * darurat "kepalan + jempol" ditangani terpisah oleh `EmergencyGestureDetector`, bukan
+     * lewat skor IDLE ini. Yang harus tetap membuat IDLE tidak yakin adalah kombinasi 4 jari
+     * panjang yang tidak cocok pola IDLE manapun.
+     */
     @Test
-    fun putar_yang_condong_tegas_menghasilkan_keyakinan_tinggi() {
-        val hand = Hand(wristY = 0.4f)
-            .finger(L.INDEX_PIP, L.INDEX_TIP, margin = 0.08f, offsetX = -0.03f)
-            .finger(L.MIDDLE_PIP, L.MIDDLE_TIP, margin = 0.08f, offsetX = 0.01f)
-            .finger(L.RING_PIP, L.RING_TIP, margin = -0.08f, offsetX = 0.03f)
+    fun kombinasi_jari_panjang_yang_tidak_cocok_pola_manapun_tidak_yakin_sebagai_idle() {
+        val hand = Hand()
+            .finger(L.INDEX_PIP, L.INDEX_TIP, margin = 0.08f, offsetX = -0.06f)
+            .finger(L.MIDDLE_PIP, L.MIDDLE_TIP, margin = -0.08f, offsetX = -0.02f)
+            .finger(L.RING_PIP, L.RING_TIP, margin = 0.08f, offsetX = 0.02f)
             .finger(L.PINKY_PIP, L.PINKY_TIP, margin = -0.08f, offsetX = 0.06f)
-            .indexTip(x = 0.70f, y = 0.14f)
             .build()
 
-        val score = scorer.score(hand, RobotAction.ROTATE_RIGHT)
+        val score = scorer.score(hand, RobotAction.IDLE)
+
+        assertTrue(score < config.unknownCeiling, "kombinasi jari acak harus UNKNOWN untuk IDLE, dapat $score")
+    }
+
+    /** Jempol yang salah baca tidak boleh menjatuhkan keyakinan MAJU/MUNDUR/PUTAR KIRI - lihat KDoc [GesturePattern]. */
+    @Test
+    fun jempol_yang_salah_baca_tidak_menurunkan_keyakinan_maju() {
+        val hand = Hand()
+            .finger(L.INDEX_PIP, L.INDEX_TIP, margin = 0.08f, offsetX = -0.06f)
+            .finger(L.MIDDLE_PIP, L.MIDDLE_TIP, margin = -0.08f, offsetX = -0.02f)
+            .finger(L.RING_PIP, L.RING_TIP, margin = -0.08f, offsetX = 0.02f)
+            .finger(L.PINKY_PIP, L.PINKY_TIP, margin = -0.08f, offsetX = 0.06f)
+            .thumb(margin = 0.08f) // Jempol "terbuka" walau pengguna hanya bermaksud 1 jari.
+            .build()
+
+        val score = scorer.score(hand, RobotAction.MOVE_FORWARD)
 
         assertEquals(ConfidenceTier.LOCKED, ConfidenceTier.of(score, config), "skor $score")
     }
 
     @Test
     fun skor_kehadiran_dari_mediapipe_ikut_membatasi_hasil() {
-        val hand = Hand(wristY = 0.35f).longFingers(margin = 0.08f)
+        val hand = Hand()
+            .finger(L.INDEX_PIP, L.INDEX_TIP, margin = 0.08f, offsetX = -0.06f)
+            .finger(L.MIDDLE_PIP, L.MIDDLE_TIP, margin = -0.08f, offsetX = -0.02f)
+            .finger(L.RING_PIP, L.RING_TIP, margin = -0.08f, offsetX = 0.02f)
+            .finger(L.PINKY_PIP, L.PINKY_TIP, margin = -0.08f, offsetX = 0.06f)
 
         val yakin = scorer.score(hand.build(confidence = 0.99f), RobotAction.MOVE_FORWARD)
         val raguRagu = scorer.score(hand.build(confidence = 0.55f), RobotAction.MOVE_FORWARD)

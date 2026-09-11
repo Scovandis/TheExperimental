@@ -1,6 +1,5 @@
 package com.experimental.robot
 
-import com.experimental.robot.domain.gesture.GestureConfig
 import com.experimental.robot.domain.gesture.HandGestureClassifier
 import com.experimental.robot.domain.model.HandFrame
 import com.experimental.robot.domain.model.HandLandmarkIndex as L
@@ -22,9 +21,7 @@ private class HandBuilder(
 
     init {
         points[L.WRIST] = HandPoint(wristX, wristY)
-        // Jempol default tertutup: tip lebih dekat ke pergelangan daripada IP.
-        points[L.THUMB_IP] = HandPoint(wristX + 0.08f, wristY - 0.02f)
-        points[L.THUMB_TIP] = HandPoint(wristX + 0.04f, wristY - 0.01f)
+        thumb(extended = false)
     }
 
     fun finger(mcp: Int, pip: Int, tip: Int, extended: Boolean, offsetX: Float = 0f) = apply {
@@ -40,89 +37,106 @@ private class HandBuilder(
         }
     }
 
-    fun pointDown(offsetX: Float = 0f) = apply {
-        val x = wristX + offsetX
-        points[L.INDEX_MCP] = HandPoint(x, wristY + 0.08f)
-        points[L.INDEX_PIP] = HandPoint(x, wristY + 0.14f)
-        points[L.INDEX_TIP] = HandPoint(x, wristY + 0.10f)
+    fun thumb(extended: Boolean) = apply {
+        points[L.THUMB_IP] = HandPoint(wristX + 0.08f, wristY - 0.02f)
+        points[L.THUMB_TIP] = if (extended) {
+            // Jauh dari pergelangan dibanding IP -> rasio jarak melewati ambang ekstensi.
+            HandPoint(wristX + 0.20f, wristY - 0.02f)
+        } else {
+            HandPoint(wristX + 0.04f, wristY - 0.01f)
+        }
     }
-
-    fun moveIndexTip(x: Float, y: Float) = apply { points[L.INDEX_TIP] = HandPoint(x, y) }
 
     fun build() = HandFrame(landmarks = points.toList())
 }
 
-private fun openPalm(wristY: Float = 0.4f): HandFrame = HandBuilder(wristY = wristY)
-    .finger(L.INDEX_MCP, L.INDEX_PIP, L.INDEX_TIP, extended = true, offsetX = -0.06f)
-    .finger(L.MIDDLE_MCP, L.MIDDLE_PIP, L.MIDDLE_TIP, extended = true, offsetX = -0.02f)
-    .finger(L.RING_MCP, L.RING_PIP, L.RING_TIP, extended = true, offsetX = 0.02f)
-    .finger(L.PINKY_MCP, L.PINKY_PIP, L.PINKY_TIP, extended = true, offsetX = 0.06f)
-    .build()
-
-private fun fist(): HandFrame = HandBuilder()
-    .finger(L.INDEX_MCP, L.INDEX_PIP, L.INDEX_TIP, extended = false, offsetX = -0.06f)
-    .finger(L.MIDDLE_MCP, L.MIDDLE_PIP, L.MIDDLE_TIP, extended = false, offsetX = -0.02f)
-    .finger(L.RING_MCP, L.RING_PIP, L.RING_TIP, extended = false, offsetX = 0.02f)
-    .finger(L.PINKY_MCP, L.PINKY_PIP, L.PINKY_TIP, extended = false, offsetX = 0.06f)
-    .build()
-
-private fun vSign(indexTipX: Float): HandFrame = HandBuilder()
-    .finger(L.INDEX_MCP, L.INDEX_PIP, L.INDEX_TIP, extended = true, offsetX = -0.04f)
-    .finger(L.MIDDLE_MCP, L.MIDDLE_PIP, L.MIDDLE_TIP, extended = true, offsetX = 0.0f)
-    .finger(L.RING_MCP, L.RING_PIP, L.RING_TIP, extended = false, offsetX = 0.04f)
-    .finger(L.PINKY_MCP, L.PINKY_PIP, L.PINKY_TIP, extended = false, offsetX = 0.08f)
-    .moveIndexTip(indexTipX, 0.24f)
+/** Tangan dengan jari terbuka sesuai [index]/[middle]/[ring]/[pinky]/[thumb] - identitas persis, tanpa posisi. */
+private fun handWithFingers(
+    index: Boolean,
+    middle: Boolean,
+    ring: Boolean,
+    pinky: Boolean,
+    thumb: Boolean,
+): HandFrame = HandBuilder()
+    .finger(L.INDEX_MCP, L.INDEX_PIP, L.INDEX_TIP, extended = index, offsetX = -0.06f)
+    .finger(L.MIDDLE_MCP, L.MIDDLE_PIP, L.MIDDLE_TIP, extended = middle, offsetX = -0.02f)
+    .finger(L.RING_MCP, L.RING_PIP, L.RING_TIP, extended = ring, offsetX = 0.02f)
+    .finger(L.PINKY_MCP, L.PINKY_PIP, L.PINKY_TIP, extended = pinky, offsetX = 0.06f)
+    .thumb(extended = thumb)
     .build()
 
 class HandGestureClassifierTest {
 
     private val classifier = HandGestureClassifier()
-    private val config = GestureConfig()
 
     @Test
-    fun fist_menghasilkan_idle() {
-        assertEquals(RobotAction.IDLE, classifier.classify(fist()).action)
+    fun kepalan_tangan_menghasilkan_idle() {
+        val hand = handWithFingers(index = false, middle = false, ring = false, pinky = false, thumb = false)
+        assertEquals(RobotAction.IDLE, classifier.classify(hand).action)
     }
 
     @Test
-    fun telapak_terbuka_di_atas_menghasilkan_maju() {
-        val result = classifier.classify(openPalm(wristY = 0.35f))
+    fun satu_jari_telunjuk_menghasilkan_maju() {
+        val hand = handWithFingers(index = true, middle = false, ring = false, pinky = false, thumb = false)
+        val result = classifier.classify(hand)
         assertEquals(RobotAction.MOVE_FORWARD, result.action)
-        assertEquals(4, result.fingers.extendedCount)
+        assertEquals(1, result.fingers.extendedCount)
     }
 
     @Test
-    fun telapak_terbuka_di_bawah_frame_menghasilkan_jongkok() {
-        val wristY = config.crouchWristY + 0.1f
-        assertEquals(RobotAction.CROUCH, classifier.classify(openPalm(wristY = wristY)).action)
-    }
-
-    @Test
-    fun telunjuk_menunjuk_bawah_menghasilkan_mundur() {
-        val hand = HandBuilder()
-            .finger(L.MIDDLE_MCP, L.MIDDLE_PIP, L.MIDDLE_TIP, extended = false, offsetX = -0.02f)
-            .finger(L.RING_MCP, L.RING_PIP, L.RING_TIP, extended = false, offsetX = 0.02f)
-            .finger(L.PINKY_MCP, L.PINKY_PIP, L.PINKY_TIP, extended = false, offsetX = 0.06f)
-            .pointDown(offsetX = -0.05f)
-            .build()
+    fun dua_jari_telunjuk_tengah_menghasilkan_mundur() {
+        val hand = handWithFingers(index = true, middle = true, ring = false, pinky = false, thumb = false)
         assertEquals(RobotAction.MOVE_BACKWARD, classifier.classify(hand).action)
     }
 
     @Test
-    fun v_sign_condong_kanan_menghasilkan_putar_kanan() {
-        val hand = vSign(indexTipX = 0.5f + config.rotateDeadZoneX + 0.05f)
+    fun tiga_jari_menghasilkan_putar_kiri() {
+        val hand = handWithFingers(index = true, middle = true, ring = true, pinky = false, thumb = false)
+        assertEquals(RobotAction.ROTATE_LEFT, classifier.classify(hand).action)
+    }
+
+    /**
+     * Regresi: deteksi jempol jauh lebih rapuh daripada 4 jari panjang (rasio jarak ke
+     * pergelangan, bukan tip-vs-PIP), dan orang secara alami tidak menekuk jempol rapat saat
+     * menunjukkan 1-3 jari. Mewajibkan jempol tertutup persis di sini membuat gestur nyaris
+     * tidak pernah cocok di kamera nyata - robot tidak bergerak sama sekali walau gestur
+     * diganti-ganti. 1-3 jari harus tetap terbaca terlepas dari status jempol.
+     */
+    @Test
+    fun satu_dua_tiga_jari_tetap_terbaca_walau_jempol_ikut_terbaca_terbuka() {
+        val maju = handWithFingers(index = true, middle = false, ring = false, pinky = false, thumb = true)
+        val mundur = handWithFingers(index = true, middle = true, ring = false, pinky = false, thumb = true)
+        val putarKiri = handWithFingers(index = true, middle = true, ring = true, pinky = false, thumb = true)
+
+        assertEquals(RobotAction.MOVE_FORWARD, classifier.classify(maju).action)
+        assertEquals(RobotAction.MOVE_BACKWARD, classifier.classify(mundur).action)
+        assertEquals(RobotAction.ROTATE_LEFT, classifier.classify(putarKiri).action)
+    }
+
+    @Test
+    fun empat_jari_tanpa_jempol_menghasilkan_putar_kanan() {
+        val hand = handWithFingers(index = true, middle = true, ring = true, pinky = true, thumb = false)
         assertEquals(RobotAction.ROTATE_RIGHT, classifier.classify(hand).action)
     }
 
     @Test
-    fun v_sign_condong_kiri_menghasilkan_putar_kiri() {
-        val hand = vSign(indexTipX = 0.5f - config.rotateDeadZoneX - 0.05f)
-        assertEquals(RobotAction.ROTATE_LEFT, classifier.classify(hand).action)
+    fun lima_jari_termasuk_jempol_menghasilkan_jongkok() {
+        val hand = handWithFingers(index = true, middle = true, ring = true, pinky = true, thumb = true)
+        assertEquals(RobotAction.CROUCH, classifier.classify(hand).action)
     }
 
     @Test
-    fun v_sign_tegak_di_dead_zone_tetap_idle() {
-        assertEquals(RobotAction.IDLE, classifier.classify(vSign(indexTipX = 0.5f)).action)
+    fun kombinasi_jari_yang_tidak_dikenal_jatuh_ke_idle() {
+        // Telunjuk + manis terbuka, tengah tertutup: bukan pola berhitung manapun.
+        val hand = handWithFingers(index = true, middle = false, ring = true, pinky = false, thumb = false)
+        assertEquals(RobotAction.IDLE, classifier.classify(hand).action)
+    }
+
+    @Test
+    fun kepalan_dengan_jempol_terentang_tetap_idle() {
+        // Disengaja: ini pola gestur darurat (EmergencyGestureDetector), harus tetap IDLE di sini.
+        val hand = handWithFingers(index = false, middle = false, ring = false, pinky = false, thumb = true)
+        assertEquals(RobotAction.IDLE, classifier.classify(hand).action)
     }
 
     @Test

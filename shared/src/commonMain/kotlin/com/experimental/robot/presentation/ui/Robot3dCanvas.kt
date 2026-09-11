@@ -101,7 +101,6 @@ fun Robot3dCanvas(
 
     // Controller kamera orbit interaktif (drag untuk memutar panggung)
     val orbit = rememberOrbitCameraController(cameraState)
-
     // Latar belakang Sci-Fi Deep Navy
     val skybox = rememberSkyboxState(
         initialSource = SkyboxSource.Color(LinearColor(0.027f, 0.051f, 0.098f))

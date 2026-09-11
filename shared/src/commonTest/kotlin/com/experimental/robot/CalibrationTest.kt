@@ -6,7 +6,6 @@ import com.experimental.robot.domain.calibration.CalibrationRecorder
 import com.experimental.robot.domain.calibration.CalibrationStep
 import com.experimental.robot.domain.calibration.HandScaleNormalizer
 import com.experimental.robot.domain.command.ControlSpaceConfig
-import com.experimental.robot.domain.gesture.GestureConfig
 import com.experimental.robot.domain.model.HandFrame
 import com.experimental.robot.domain.model.HandLandmarkIndex as L
 import com.experimental.robot.domain.model.HandPoint
@@ -92,56 +91,22 @@ class CalibrationRecorderTest {
         assertEquals(0.50f, profile.neutralY, 0.01f)
     }
 
+    /** Recorder yang belum menerima sampel sama sekali tetap harus menghasilkan profil bawaan penuh. */
     @Test
-    fun ambang_jongkok_jatuh_di_tengah_antara_netral_dan_tangan_diturunkan() {
+    fun tidak_ada_sampel_sama_sekali_jatuh_ke_profil_bawaan() {
         val recorder = recorder()
-        fill(recorder, CalibrationStep.CENTER, 0.5f, 0.50f)
-        fill(recorder, CalibrationStep.DOWN, 0.5f, 0.90f)
 
         val profile = recorder.build()
 
-        assertEquals(0.70f, profile.crouchWristY, 0.01f)
+        assertEquals(CalibrationProfile.DEFAULT, profile)
     }
 
     @Test
-    fun dead_zone_putar_diambil_dari_jangkauan_terkecil_pengguna() {
-        val recorder = recorder()
-        fill(recorder, CalibrationStep.CENTER, 0.50f, 0.5f)
-        fill(recorder, CalibrationStep.LEFT, 0.20f, 0.5f)
-        fill(recorder, CalibrationStep.RIGHT, 0.62f, 0.5f)
+    fun profil_menggeser_ruang_kontrol() {
+        val profile = CalibrationProfile(neutralX = 0.45f, neutralY = 0.52f)
 
-        val profile = recorder.build()
-
-        // Jangkauan terkecil = kanan (0.12), sepertiganya = 0.04.
-        assertEquals(0.04f, profile.rotateDeadZoneX, 0.005f)
-    }
-
-    /** Kalibrasi yang ditinggalkan separuh jalan tetap harus menghasilkan profil layak pakai. */
-    @Test
-    fun langkah_yang_belum_terekam_jatuh_ke_nilai_bawaan() {
-        val recorder = recorder()
-        fill(recorder, CalibrationStep.CENTER, 0.5f, 0.5f)
-
-        val profile = recorder.build()
-
-        assertEquals(CalibrationProfile.DEFAULT.crouchWristY, profile.crouchWristY)
-        assertEquals(CalibrationProfile.DEFAULT.rotateDeadZoneX, profile.rotateDeadZoneX)
-    }
-
-    @Test
-    fun profil_menggeser_ambang_gestur_dan_ruang_kontrol() {
-        val profile = CalibrationProfile(
-            neutralX = 0.45f,
-            neutralY = 0.52f,
-            crouchWristY = 0.72f,
-            rotateDeadZoneX = 0.08f,
-        )
-
-        val gesture = profile.applyTo(GestureConfig())
         val control = profile.applyTo(ControlSpaceConfig())
 
-        assertEquals(0.72f, gesture.crouchWristY)
-        assertEquals(0.08f, gesture.rotateDeadZoneX)
         assertEquals(0.45f, control.neutralX)
         assertEquals(0.52f, control.neutralY)
     }

@@ -28,7 +28,8 @@ import com.experimental.robot.presentation.viewmodel.RobotControlViewModel
  *
  * Seluruh ambang batas yang bisa dikalibrasi berkumpul di sini - [GestureConfig],
  * [ConfidenceConfig], [ControlSpaceConfig], [SafetyConfig], [MotionConfig] - sehingga
- * penyetelan perangkat tidak pernah menyentuh algoritma.
+ * penyetelan perangkat tidak pernah menyentuh algoritma. [GestureConfig] sendiri saat
+ * ini selalu memakai nilai bawaan: profil kalibrasi hanya menggeser [ControlSpaceConfig].
  */
 object RobotGraph {
 
@@ -37,7 +38,7 @@ object RobotGraph {
     private val repository: HandTrackingRepository get() = handLandmarkStream
 
     /**
-     * Ambang batas gestur, sudah digeser profil kalibrasi bila ada.
+     * Posisi netral ruang kontrol (dan lebar tangan), sudah digeser profil kalibrasi bila ada.
      *
      * TODO(AUDIT_INCOMPLETE.md #2): tidak ada pemanggil yang pernah menulis ke var ini setelah
      * wizard kalibrasi selesai — [RobotControlViewModel.finishCalibration] menyimpan hasilnya ke
@@ -48,7 +49,8 @@ object RobotGraph {
 
     fun createRobotControlViewModel(): RobotControlViewModel {
         // Diterapkan hanya sekali di sini, saat ViewModel dibuat — lihat TODO pada [calibration].
-        val gestureConfig = calibration.applyTo(GestureConfig())
+        // GestureConfig sendiri tidak lagi digeser oleh kalibrasi — lihat KDoc CalibrationProfile.
+        val gestureConfig = GestureConfig()
         val controlSpaceConfig = calibration.applyTo(ControlSpaceConfig())
 
         return RobotControlViewModel(

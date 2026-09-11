@@ -68,8 +68,13 @@ niat itu dan sambungkan sebagai opsi render mode ketiga yang benar-benar bisa di
 (`var calibration`, `createRobotControlViewModel()`)
 
 **Alur yang seharusnya terjadi:** wizard kalibrasi merekam sampel tangan pengguna → menghitung
-`CalibrationProfile` baru → profil itu di-`applyTo()`-kan ke `GestureConfig`/`ControlSpaceConfig`
-→ ambang batas klasifikasi gestur & control-space jadi lebih akurat untuk pengguna tersebut.
+`CalibrationProfile` baru → profil itu di-`applyTo()`-kan ke `ControlSpaceConfig` → posisi netral
+control-space jadi lebih akurat untuk tangan pengguna tersebut.
+>
+> Catatan (setelah klasifikasi gestur dipindah ke identitas jari / `GesturePattern`):
+> `CalibrationProfile` tidak lagi punya `applyTo(GestureConfig)` — tidak ada lagi ambang
+> posisi/kemiringan tangan pada klasifikasi gestur yang perlu dikalibrasi. Bug di bawah ini kini
+> murni soal `ControlSpaceConfig` (posisi netral), bukan lagi soal `GestureConfig`.
 
 **Yang benar-benar terjadi:**
 - `RobotGraph.calibration` di-`applyTo()`-kan **hanya sekali**, saat `createRobotControlViewModel()`
@@ -82,13 +87,13 @@ niat itu dan sambungkan sebagai opsi render mode ketiga yang benar-benar bisa di
   (`RobotGraph.kt:48,52`); tidak ada mekanisme rebuild config setelah kalibrasi selesai.
 
 **Dampak:** pengguna menyelesaikan wizard kalibrasi 6 langkah (proses ini memakan waktu &
-usaha), UI menunjukkan progress dan "selesai", tapi **ambang batas gestur yang benar-benar
-dipakai tidak berubah sama sekali**. Fitur ini secara fungsional adalah no-op yang terlihat
-seperti bekerja.
+usaha), UI menunjukkan progress dan "selesai", tapi **posisi netral control-space yang
+benar-benar dipakai tidak berubah sama sekali**. Fitur ini secara fungsional adalah no-op yang
+terlihat seperti bekerja.
 
 **Rekomendasi:** setelah `finishCalibration()`, tulis hasil ke `RobotGraph.calibration` lalu
-buat ulang (atau re-konfigurasi) `classifier`/`interpreter` yang dipakai ViewModel — atau ubah
-`GestureConfig`/`ControlSpaceConfig` menjadi `mutableStateOf`/reaktif yang dibaca ulang tiap tick.
+buat ulang (atau re-konfigurasi) `interpreter` yang dipakai ViewModel — atau ubah
+`ControlSpaceConfig` menjadi `mutableStateOf`/reaktif yang dibaca ulang tiap tick.
 
 ---
 

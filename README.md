@@ -132,7 +132,7 @@ kontrol manual.
 | Gejala                                   | Yang diubah                                              |
 |------------------------------------------|----------------------------------------------------------|
 | Aksi terasa lambat berganti              | `GestureDebouncer(framesToConfirm = …)` di `RobotGraph`   |
-| Jongkok terpicu terlalu mudah/sulit      | `GestureConfig.crouchWristY`                              |
-| Putar terpicu saat tangan hampir tegak   | `GestureConfig.rotateDeadZoneX`                           |
+| Jari kurang/lebih sensitif dibaca terbuka | `GestureConfig.fingerExtensionMargin`                     |
+| Jempol (JONGKOK) sulit/mudah terpicu     | `GestureConfig.thumbExtensionRatio`                        |
 | Robot terlalu cepat/lambat               | `MotionConfig.forwardSpeed`, `rotationSpeed`              |
 | Landmark masih bergetar                  | `LandmarkSmoother(alpha = …)` di `HandLandmarkStream`     |
