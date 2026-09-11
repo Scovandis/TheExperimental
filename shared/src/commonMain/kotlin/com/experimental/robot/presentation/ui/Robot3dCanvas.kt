@@ -16,8 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.experimental.robot.domain.model.RobotAction
@@ -72,6 +74,24 @@ fun Robot3dCanvas(
     cameraDistance: Float = 5.2f,
     modifier: Modifier = Modifier,
 ) {
+    // Prevent Filament JNI initialization in Android Studio Preview
+    if (LocalInspectionMode.current) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color(0xFF070D19)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "3D Rendering Disabled in Preview",
+                color = accent.copy(alpha = 0.6f),
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+        return
+    }
+
     // State kamera Filament
     val cameraState = rememberCameraState(
         initialEye = Position(0f, 1.8f, cameraDistance),

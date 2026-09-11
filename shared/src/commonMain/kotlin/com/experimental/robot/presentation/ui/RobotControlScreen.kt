@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -310,7 +311,10 @@ fun RobotControlScreen(
 /** Panggung robot: memilih renderer 3D atau siluet 2D sesuai mode. */
 @Composable
 private fun RobotStage(state: RobotUiState, modifier: Modifier = Modifier) {
-    when (state.renderMode) {
+    // Gunakan 2D Canvas di Preview untuk menghindari UnsatisfiedLinkError dari Filament
+    val effectiveMode = if (LocalInspectionMode.current) RobotRenderMode.TWO_D else state.renderMode
+
+    when (effectiveMode) {
         RobotRenderMode.THREE_D -> Robot3dCanvas(
             state = state.robot,
             accent = RobotColors.forAction(state.stableAction),

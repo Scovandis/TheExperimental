@@ -2,6 +2,7 @@ package com.experimental.robot.presentation.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -46,6 +48,14 @@ import com.experimental.robot.domain.model.HaltMode
 import com.experimental.robot.domain.model.RobotAction
 import com.experimental.robot.presentation.viewmodel.RobotRenderMode
 import com.experimental.robot.presentation.viewmodel.RobotUiState
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
+import theexcerimantal.shared.generated.resources.Res
+import theexcerimantal.shared.generated.resources.ic_gesture_backward
+import theexcerimantal.shared.generated.resources.ic_gesture_crouch
+import theexcerimantal.shared.generated.resources.ic_gesture_forward
+import theexcerimantal.shared.generated.resources.ic_gesture_rotate_left
+import theexcerimantal.shared.generated.resources.ic_gesture_rotate_right
 
 // ── TOP DASHBOARD BAR ────────────────────────────────────────────────────────
 
@@ -812,7 +822,7 @@ fun PetaGesturGrid(
                 number = "2",
                 action = RobotAction.MOVE_FORWARD,
                 label = "MAJU",
-                subtitle = "(Telapak terbuka)",
+                subtitle = "(1 Jari)",
                 isActive = activeAction == RobotAction.MOVE_FORWARD,
                 onClick = { onGestureClick(RobotAction.MOVE_FORWARD) },
                 modifier = Modifier.weight(1f),
@@ -821,7 +831,7 @@ fun PetaGesturGrid(
                 number = "3",
                 action = RobotAction.MOVE_BACKWARD,
                 label = "MUNDUR",
-                subtitle = "(Telunjuk ke bawah)",
+                subtitle = "(2 Jari)",
                 isActive = activeAction == RobotAction.MOVE_BACKWARD,
                 onClick = { onGestureClick(RobotAction.MOVE_BACKWARD) },
                 modifier = Modifier.weight(1f),
@@ -837,7 +847,7 @@ fun PetaGesturGrid(
                 number = "4",
                 action = RobotAction.ROTATE_LEFT,
                 label = "PUTAR KIRI",
-                subtitle = "(V-sign kiri)",
+                subtitle = "(3 Jari)",
                 isActive = activeAction == RobotAction.ROTATE_LEFT,
                 onClick = { onGestureClick(RobotAction.ROTATE_LEFT) },
                 modifier = Modifier.weight(1f),
@@ -846,7 +856,7 @@ fun PetaGesturGrid(
                 number = "5",
                 action = RobotAction.ROTATE_RIGHT,
                 label = "PUTAR KANAN",
-                subtitle = "(V-sign kanan)",
+                subtitle = "(4 Jari)",
                 isActive = activeAction == RobotAction.ROTATE_RIGHT,
                 onClick = { onGestureClick(RobotAction.ROTATE_RIGHT) },
                 modifier = Modifier.weight(1f),
@@ -855,13 +865,22 @@ fun PetaGesturGrid(
                 number = "6",
                 action = RobotAction.CROUCH,
                 label = "JONGKOK",
-                subtitle = "(Telapak ke bawah)",
+                subtitle = "(5 Jari)",
                 isActive = activeAction == RobotAction.CROUCH,
                 onClick = { onGestureClick(RobotAction.CROUCH) },
                 modifier = Modifier.weight(1f),
             )
         }
     }
+}
+
+private fun gestureImageResFor(action: RobotAction): DrawableResource? = when (action) {
+    RobotAction.IDLE -> null // Menyusul: masih pakai HandGestureSilhouette (kepalan tangan)
+    RobotAction.MOVE_FORWARD -> Res.drawable.ic_gesture_forward
+    RobotAction.MOVE_BACKWARD -> Res.drawable.ic_gesture_backward
+    RobotAction.ROTATE_LEFT -> Res.drawable.ic_gesture_rotate_left
+    RobotAction.ROTATE_RIGHT -> Res.drawable.ic_gesture_rotate_right
+    RobotAction.CROUCH -> Res.drawable.ic_gesture_crouch
 }
 
 @Composable
@@ -906,13 +925,22 @@ private fun GestureCardItem(
             }
         }
 
-        // Gesture Illustration Vector
-        HandGestureSilhouette(
-            action = action,
-            color = if (isActive) Color(0xFF00F5A0) else Color(0xFFFDBA74),
-            modifier = Modifier.size(36.dp),
-        )
-
+        // Gesture Illustration: foto tangan per jumlah jari (IDLE masih pakai vektor kepalan tangan sampai gambarnya tersedia)
+        val gestureImage = gestureImageResFor(action)
+        if (gestureImage != null) {
+            Image(
+                painter = painterResource(gestureImage),
+                contentDescription = label,
+                modifier = Modifier.size(36.dp),
+                contentScale = ContentScale.Fit,
+            )
+        } else {
+            HandGestureSilhouette(
+                action = action,
+                color = if (isActive) Color(0xFF00F5A0) else Color(0xFFFDBA74),
+                modifier = Modifier.size(36.dp),
+            )
+        }
         // Labels
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
