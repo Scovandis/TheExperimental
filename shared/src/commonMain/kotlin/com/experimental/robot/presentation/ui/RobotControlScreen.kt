@@ -126,12 +126,12 @@ fun RobotControlScreen(
                         )
 
                         // Deck Kontrol: Aksi Saat Ini + Status Kecepatan + Tombol Emergency Stop
-                        CenterActionDeck(
+                        /*CenterActionDeck(
                             state = state,
                             onEmergencyStop = viewModel::onEmergencyStop,
                             onReset = viewModel::resetRobot,
                             modifier = Modifier.fillMaxWidth(),
-                        )
+                        )*/
                     }
 
                     // KOLOM KANAN: Peta Gestur + Gesture & Hand Info + Mode & View
@@ -312,7 +312,7 @@ fun RobotControlScreen(
 @Composable
 private fun RobotStage(state: RobotUiState, modifier: Modifier = Modifier) {
     // Gunakan 2D Canvas di Preview untuk menghindari UnsatisfiedLinkError dari Filament
-    val effectiveMode = if (LocalInspectionMode.current) RobotRenderMode.TWO_D else state.renderMode
+    val effectiveMode = if (LocalInspectionMode.current) RobotRenderMode.THREE_D else state.renderMode
 
     when (effectiveMode) {
         RobotRenderMode.THREE_D -> Robot3dCanvas(
