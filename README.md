@@ -2,22 +2,29 @@
 
 Aplikasi Kotlin Multiplatform (Android / Desktop / iOS) yang mengendalikan animasi robot
 prosedural memakai gestur tangan. Pipeline Android: **CameraX → MediaPipe Hand Landmarker →
-Gesture Classifier → Debouncer → Motion Engine → Compose Canvas**.
+Gesture Classifier → Temporal Stabilizer → Motion Engine → Filament / Compose Canvas**.
 
 ## Peta gestur
 
-| Aksi robot     | Pola gestur                        | Logika landmark                                                   |
-|----------------|------------------------------------|-------------------------------------------------------------------|
-| `IDLE`         | Kepalan tangan                     | Semua jari tertutup (tip di bawah PIP)                            |
-| `MOVE_FORWARD` | Telapak terbuka di area atas       | ≥4 jari panjang terbuka & `wrist.y ≤ 0.65`                        |
-| `MOVE_BACKWARD`| Telunjuk menunjuk ke bawah         | Hanya telunjuk terbuka & `indexTip.y > wrist.y + 0.03`            |
-| `ROTATE_LEFT`  | V-sign condong ke kiri             | Telunjuk+tengah terbuka & `indexTip.x < wrist.x - 0.05`           |
-| `ROTATE_RIGHT` | V-sign condong ke kanan            | Telunjuk+tengah terbuka & `indexTip.x > wrist.x + 0.05`           |
-| `CROUCH`       | Telapak terbuka didorong ke bawah  | ≥4 jari panjang terbuka & `wrist.y > 0.65`                        |
+Klasifikasi murni berdasarkan **identitas jari yang terbuka** — sama seperti berhitung
+dengan tangan, bukan posisi/kemiringan tangan di frame (`GesturePattern.kt`):
 
-Ambang batas terkumpul di `GestureConfig` supaya bisa dikalibrasi tanpa mengubah algoritma.
-Jempol dinilai dari jarak euclidean tip-vs-IP ke pergelangan (bukan perbandingan X), agar
-tetap benar untuk tangan kiri maupun frame kamera depan yang di-mirror.
+| Aksi robot     | Pola gestur                          | Jari terbuka                          |
+|----------------|---------------------------------------|----------------------------------------|
+| `IDLE`         | Kepalan tangan                        | 0 jari                                 |
+| `MOVE_FORWARD` | Telunjuk saja                         | 1 (telunjuk)                           |
+| `MOVE_BACKWARD`| V-sign                                | 2 (telunjuk + tengah)                  |
+| `ROTATE_LEFT`  | Tiga jari                             | 3 (+ manis)                            |
+| `ROTATE_RIGHT` | Empat jari tanpa jempol               | 4 (+ kelingking, jempol tertutup)      |
+| `CROUCH`       | Telapak terbuka penuh                 | 5 (+ jempol)                           |
+
+Kombinasi jari yang tidak cocok pola manapun jatuh ke `IDLE` sebagai default aman. Ambang
+deteksi terkumpul di `GestureConfig` (`fingerExtensionMargin` untuk 4 jari panjang,
+`thumbExtensionRatio` untuk jempol) supaya bisa dikalibrasi tanpa mengubah algoritma. Jempol
+dinilai dari rasio jarak euclidean tip-vs-IP ke pergelangan (bukan perbandingan X), agar tetap
+benar untuk tangan kiri maupun frame kamera depan yang di-mirror. `GestureConfidenceScorer` +
+`TemporalStabilizer` (hysteresis lock, holdMs=300) menstabilkan aksi sebelum diteruskan ke
+robot — detail lengkap di [`docs/FLOW.md`](./docs/FLOW.md).
 
 ## Alur end-to-end
 
@@ -31,7 +38,7 @@ tetap benar untuk tangan kiri maupun frame kamera depan yang di-mirror.
 [ HandLandmarkStream ]  ← satu-satunya jembatan platform → shared
         │  EMA LandmarkSmoother (anti jitter)
         ▼
-[ HandGestureClassifier ] → [ GestureDebouncer: tahan 4 frame ]
+[ HandGestureClassifier ] → [ TemporalStabilizer: hysteresis lock 300ms ]
         │  RobotAction stabil
         ▼
 [ RobotControlViewModel ]  loop 60 FPS
@@ -42,21 +49,12 @@ tetap benar untuk tangan kiri maupun frame kamera depan yang di-mirror.
 
 ## Visualisasi robot (3D & 2D)
 
-Robot dirender **3D** memakai renderer software sendiri di `commonMain` — tanpa engine
-grafis tambahan, sehingga hasilnya identik di Android, Desktop, dan iOS:
+Render 3D produksi memakai **Filament KMP** (`io.github.erkko68.filament`, `Robot3dCanvas.kt`)
+— PBR hardware-accelerated dengan directional light + shadow, bloom/FXAA, dan kamera orbit
+drag; model robot dirakit langsung dari primitif Filament (`Cube`/`Cylinder`/`Sphere`/`Group`),
+berjalan di Android, Desktop, dan iOS.
 
-```
-presentation/render/
-├── Vec3, Mat4            # aljabar vektor & matriks affine 4x4
-├── Mesh (Face, box, groundQuad)
-│                         # model robot = ±20 balok; winding CCW menghadap luar
-├── Camera                # kamera orbit (target, distance, azimuth, pitch, focal)
-├── SoftwareRenderer      # proyeksi perspektif → back-face culling →
-│                         # painter's algorithm → flat shading Lambert
-└── RobotMeshBuilder      # menyusun robot + rig sederhana dari RobotState
-```
-
-Pemetaan state ke 3D jadi transformasi sesungguhnya:
+Pemetaan state ke transformasi 3D:
 
 | State        | Transformasi 3D                                                        |
 |--------------|------------------------------------------------------------------------|
@@ -65,28 +63,37 @@ Pemetaan state ke 3D jadi transformasi sesungguhnya:
 | `scaleY`     | pinggul turun & kaki memendek; telapak tetap menapak lantai `y = 0`     |
 | `walkPhase`  | rotasi engsel bahu & pinggul (ayunan lengan/kaki berlawanan fase)       |
 
-Kamera orbit selalu diarahkan ke `target`, jadi robot tetap di tengah panggung pada
-pitch/azimut apa pun; azimut default `-24°` memberi sudut pandang 3/4. Tombol
-**TAMPILAN: 3D/2D** di kiri atas berpindah ke renderer siluet 2D (`RobotCanvas`) yang
-lebih ringan untuk perangkat kelas bawah — pilihannya disimpan di `RobotUiState.renderMode`.
+Tombol **TAMPILAN: 3D/2D** di kiri atas berpindah ke renderer siluet 2D (`RobotCanvas`,
+Compose `Canvas` murni, independen dari Filament) yang lebih ringan untuk perangkat kelas
+bawah — pilihannya disimpan di `RobotUiState.renderMode`.
+
+> **Catatan:** `presentation/render/*` (`Vec3`, `Mat4`, `Mesh`, `SoftwareRenderer`,
+> `RobotMeshBuilder`, `ObjMeshLoader`) adalah rasterizer software generasi sebelum migrasi ke
+> Filament — **tidak dipanggil dari mana pun** di produksi (dead code), lihat
+> [`docs/AUDIT_INCOMPLETE.md` #1](./docs/AUDIT_INCOMPLETE.md#1-tiga-implementasi-renderer-robot-3d--hanya-2-yang-terpakai).
 
 ## Struktur MVVM
 
 ```
 shared/src/commonMain/kotlin/com/experimental/robot/
 ├── domain/                                  # Model — murni Kotlin, tanpa API platform
-│   ├── model/     RobotAction, HandPoint, HandLandmarkIndex, HandFrame,
-│   │              FingerState, RobotState
-│   ├── gesture/   GestureConfig, FingerExtensionDetector, GestureClassifier,
-│   │              HandGestureClassifier, GestureDebouncer, LandmarkSmoother
-│   └── motion/    MotionConfig, RobotMotionEngine
+│   ├── model/       RobotAction, RobotCommand, HaltMode, HandPoint, HandLandmarkIndex,
+│   │                HandFrame, FingerState, RobotState
+│   ├── gesture/      GestureConfig, GesturePattern, FingerExtensionDetector,
+│   │                HandGestureClassifier, GestureConfidenceScorer, TemporalStabilizer,
+│   │                EmergencyGestureDetector, LandmarkSmoother
+│   ├── calibration/ CalibrationProfile, CalibrationRecorder — wizard kalibrasi
+│   ├── command/     ControlSpace, CommandInterpreter, SlewRateLimiter
+│   ├── safety/      SafetyController — gerbang keselamatan berlapis (lihat §5 FLOW.md)
+│   └── motion/      MotionConfig, RobotMotionEngine
 ├── data/                                    # Sumber data
-│   ├── HandTrackingRepository (kontrak), TrackerStatus
+│   ├── HandTrackingRepository (kontrak), TrackerStatus, FrameRateMeter
 │   └── HandLandmarkStream (implementasi + buffer DROP_OLDEST)
 ├── presentation/
 │   ├── viewmodel/ RobotUiState, RobotControlViewModel
-│   └── ui/        RobotControlScreen, RobotCanvas, HandSkeletonOverlay,
-│                  GestureHud, ManualControlPad, RobotTheme, CameraFeed (expect)
+│   ├── ui/        RobotControlScreen, DashboardComponents, Robot3dCanvas (Filament),
+│   │              RobotCanvas (2D), HandSkeletonOverlay, RobotTheme, CameraFeed (expect)
+│   └── render/    rasterizer software — dead code, lihat catatan di § Visualisasi robot
 └── di/            RobotGraph (service locator)
 
 shared/src/androidMain/.../robot/
@@ -96,14 +103,20 @@ shared/src/androidMain/.../robot/
 
 - **View** (`presentation/ui`) hanya membaca `RobotUiState` dan mengirim event; tidak ada
   logika gestur di composable.
-- **ViewModel** menggabungkan repository + classifier + debouncer + motion engine, dan
-  menjalankan loop gerak berbasis `deltaTime` sehingga robot bergerak kontinu selama gestur
-  ditahan (bukan sekali lompat per frame kamera).
+- **ViewModel** menggabungkan repository + classifier + interpreter + safety controller +
+  motion engine, dan menjalankan loop kendali independen 60 FPS (`tick()`) terpisah dari FPS
+  kamera — lihat [`docs/FLOW.md` §3](./docs/FLOW.md#3-dua-clock-yang-berjalan-terpisah).
 - **Model/Domain** 100% common dan teruji unit test.
 
 Platform tanpa binding kamera (Desktop/iOS pada build ini) menerbitkan
-`TrackerStatus.Unsupported`, dan layar otomatis menampilkan `ManualControlPad` sehingga
-layer domain serta animasi tetap dapat dicoba.
+`TrackerStatus.Unsupported`, dan layar jatuh ke kontrol manual (tap kartu gestur di
+`PetaGesturGrid`) sehingga layer domain serta animasi tetap dapat dicoba.
+
+> **Catatan:** kontrol manual saat ini punya bug stuck-override (tap sekali mengunci aksi
+> permanen sampai Reset/Emergency Stop ditekan) — lihat
+> [`docs/AUDIT_INCOMPLETE.md` #4](./docs/AUDIT_INCOMPLETE.md#4-kontrol-manual-tap-gestur-macet-permanen--stuck-override-bug-paling-serius).
+> Komponen `ManualControlPad.kt` yang sudah dibangun benar (press-and-hold) juga ada di kode
+> tapi belum disambungkan ke layar manapun.
 
 ## Model MediaPipe
 
@@ -123,7 +136,10 @@ kontrol manual.
 
 ## Test
 
-- `./gradlew :shared:jvmTest` — 20 test: classifier (9), debouncer (4), motion engine (7)
+- `./gradlew :shared:jvmTest` — 11 file test domain, ~125 `@Test`: classifier, confidence
+  scorer, temporal stabilizer, state machine, command interpreter, control space, motion
+  engine, safety controller, kalibrasi (`RobotControlViewModel` sendiri **belum** punya test —
+  lihat [`docs/AUDIT_INCOMPLETE.md` #9](./docs/AUDIT_INCOMPLETE.md#9-cakupan-test-yang-kosong))
 - `./gradlew :shared:testAndroidHostTest`
 - `./gradlew :shared:iosSimulatorArm64Test` (perlu macOS)
 
@@ -131,8 +147,18 @@ kontrol manual.
 
 | Gejala                                   | Yang diubah                                              |
 |------------------------------------------|----------------------------------------------------------|
-| Aksi terasa lambat berganti              | `GestureDebouncer(framesToConfirm = …)` di `RobotGraph`   |
+| Aksi terasa lambat berganti              | `TemporalStabilizer(holdMs = …)` di `RobotGraph`          |
 | Jari kurang/lebih sensitif dibaca terbuka | `GestureConfig.fingerExtensionMargin`                     |
 | Jempol (JONGKOK) sulit/mudah terpicu     | `GestureConfig.thumbExtensionRatio`                        |
 | Robot terlalu cepat/lambat               | `MotionConfig.forwardSpeed`, `rotationSpeed`              |
 | Landmark masih bergetar                  | `LandmarkSmoother(alpha = …)` di `HandLandmarkStream`     |
+
+## Dokumentasi lebih lengkap
+
+- [`docs/FLOW.md`](./docs/FLOW.md) — arsitektur & alur end-to-end detail (dua-clock, safety
+  gates, kalibrasi, kontrol manual), dengan diagram.
+- [`docs/AUDIT_INCOMPLETE.md`](./docs/AUDIT_INCOMPLETE.md) — 9 temuan fitur belum
+  selesai/tidak sinkron (termasuk 2 bug fungsional kritis: kalibrasi tidak pernah diterapkan,
+  dan kontrol manual macet permanen).
+- [`docs/TEST_CASES.md`](./docs/TEST_CASES.md) — skenario manual untuk mereproduksi tiap
+  temuan di atas.
